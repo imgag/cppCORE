@@ -205,9 +205,9 @@ void Histogram::store(QString filename, bool x_log_scale, bool y_log_scale, doub
 	else
 	{
 		QValueAxis *value_axis = new QValueAxis();
+		value_axis->setRange(x_min, max());
 		value_axis->setTickCount(10);
 		value_axis->applyNiceNumbers();
-		value_axis->setRange(x_min, max());
 		axis_x = value_axis;
 	}
 	if (!xlabel_.isEmpty()) axis_x->setTitleText(xlabel_);

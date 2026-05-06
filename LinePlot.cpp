@@ -46,22 +46,22 @@ void LinePlot::store(QString filename)
 
 	if (!yrange_set_)
 	{
-		double minVal = std::numeric_limits<double>::max();
-		double maxVal = -std::numeric_limits<double>::max();
+		double min_val = std::numeric_limits<double>::max();
+		double max_val = -std::numeric_limits<double>::max();
 
 		for (const PlotLine& line : lines_)
 		{
 			for (double value : line.values)
 			{
-				minVal = std::min(value, minVal);
-				maxVal = std::max(value, maxVal);
+				min_val = std::min(value, min_val);
+				max_val = std::max(value, max_val);
 			}
 		}
 
-		if (maxVal > minVal)
+		if (max_val > min_val)
 		{
-			ymin_ = minVal - 0.01 * (maxVal - minVal);
-			ymax_ = maxVal + 0.01 * (maxVal - minVal);
+			ymin_ = min_val - 0.01 * (max_val - min_val);
+			ymax_ = max_val + 0.01 * (max_val - min_val);
 		}
 	}
 
@@ -71,6 +71,15 @@ void LinePlot::store(QString filename)
 	// create axes
 	QValueAxis* axis_x = new QValueAxis();
 	if (!xlabel_.isEmpty()) axis_x->setTitleText(xlabel_);
+	double xmin = std::numeric_limits<double>::max();
+	double xmax = -std::numeric_limits<double>::max();
+	for (double v : xvalues_)
+	{
+		if (!std::isfinite(v)) continue;
+		if (v < xmin) xmin = v;
+		if (v > xmax) xmax = v;
+	}
+	axis_x->setRange(xmin, xmax);
 	axis_x->applyNiceNumbers();
 	chart->addAxis(axis_x, Qt::AlignBottom);
 
