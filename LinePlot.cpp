@@ -73,12 +73,17 @@ void LinePlot::store(QString filename)
 	if (!xlabel_.isEmpty()) axis_x->setTitleText(xlabel_);
 	double xmin = std::numeric_limits<double>::max();
 	double xmax = -std::numeric_limits<double>::max();
-	for (double v : xvalues_)
+	for (double value : xvalues_)
 	{
-		if (!std::isfinite(v)) continue;
-		if (v < xmin) xmin = v;
-		if (v > xmax) xmax = v;
+		xmin = std::min(value, xmin);
+		xmax = std::max(value, xmax);
 	}
+	if (xvalues_.isEmpty())
+	{
+		xmin = ymin_;
+		xmax = ymax_;
+	}
+
 	axis_x->setRange(xmin, xmax);
 	axis_x->applyNiceNumbers();
 	chart->addAxis(axis_x, Qt::AlignBottom);
