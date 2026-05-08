@@ -1,7 +1,6 @@
 #include "BarPlot.h"
 
 #include <limits>
-#include <QFontDatabase>
 #include <QChartView>
 #include <QBarCategoryAxis>
 #include <QValueAxis>

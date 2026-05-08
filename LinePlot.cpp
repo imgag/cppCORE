@@ -49,7 +49,7 @@ void LinePlot::store(QString filename)
 		double min_val = std::numeric_limits<double>::max();
 		double max_val = -std::numeric_limits<double>::max();
 
-		for (const PlotLine& line : lines_)
+		for (const PlotLine& line : std::as_const(lines_))
 		{
 			for (double value : line.values)
 			{
@@ -98,7 +98,7 @@ void LinePlot::store(QString filename)
 	chart->addAxis(axis_y, Qt::AlignLeft);
 
 	// series of data points
-	for (const PlotLine& line : lines_)
+	for (const PlotLine& line : std::as_const(lines_))
 	{
 		QLineSeries* series = new QLineSeries();
 		series->setName(line.label);

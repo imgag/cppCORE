@@ -1,7 +1,5 @@
 #include "PlotUtils.h"
 #include "Exceptions.h"
-#include "Log.h"
-
 #include <QApplication>
 #include <QFontDatabase>
 #include <QLineSeries>
@@ -88,7 +86,7 @@ void PlotUtils::overpaintAxisX(QValueAxis* axis_x, QValueAxis* axis_y, double ma
 		if (area->name() == "x_axis")
 		{
 			auto markers = chart_->legend()->markers(area);
-			for (auto m : markers) m->setVisible(false);
+			for (auto m : std::as_const(markers)) m->setVisible(false);
 		}
 	}
 }
