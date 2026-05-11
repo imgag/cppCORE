@@ -375,7 +375,7 @@ QSharedPointer<QFile> Helper::openFileForReading(QString file_name, bool stdin_i
 	QSharedPointer<QFile> file(new QFile(file_name));
 	if (stdin_if_empty && file_name=="")
 	{
-		file->open(stdin, QFile::ReadOnly | QIODevice::Text);
+		if (!file->open(stdin, QFile::ReadOnly | QIODevice::Text)) THROW(FileAccessException, "Could not open stdin for reading!");
 	}
 	else if (!file->open(QFile::ReadOnly | QIODevice::Text))
 	{
@@ -389,7 +389,7 @@ QSharedPointer<QFile> Helper::openFileForWriting(QString file_name, bool stdout_
 	QSharedPointer<QFile> file(new QFile(file_name));
 	if (stdout_if_file_empty && file_name=="")
 	{
-		file->open(stdout, QFile::WriteOnly);
+		if (!file->open(stdout, QFile::WriteOnly)) THROW(FileAccessException, "Could not open stdout for writing!");
 	}
 	else if (!file->open(QFile::WriteOnly | (append? QFile::Append : QFile::Truncate)))
 	{
