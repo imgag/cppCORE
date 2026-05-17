@@ -80,10 +80,14 @@ public:
 	}
 
 	template <typename T>
-	static QList<T> setToList(const QSet<T>& set, bool needs_sorting=false)
+	static QList<T> setToList(const QSet<T>& set, bool needs_sorting=false, bool reverse_sort_order = false)
 	{
 		QList<T> list = QList<T>(set.begin(), set.end());
-		if (needs_sorting) std::sort(list.begin(), list.end());
+		if (needs_sorting)
+		{
+			if (reverse_sort_order) std::sort(list.begin(), list.end(), std::greater<T>());
+			else std::sort(list.begin(), list.end());
+		}
 		return list;
 	}
 
