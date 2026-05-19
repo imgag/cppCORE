@@ -1,29 +1,18 @@
 #include "HttpRequestHandler.h"
 #include "Exceptions.h"
-
+#include "ProxyCredentialsHandler.h"
 #include <QEventLoop>
 #include <QNetworkProxy>
 #include <QHttpMultiPart>
-#include "CustomProxyService.h"
 
-HttpRequestHandler::HttpRequestHandler(QNetworkProxy proxy, QObject* parent)
+HttpRequestHandler::HttpRequestHandler(QObject* parent)
 	: QObject(parent)
 	, nmgr_()
 	, headers_()
 {
-
 	//default headers
 	setHeader("User-Agent", "GSvar");
 	setHeader("X-Custom-User-Agent", "GSvar");
-
-    //proxy settings
-    nmgr_.setProxy(proxy);
-
-    //override existing proxy, if custom proxy settings have been provided
-    if (CustomProxyService::getProxy() != QNetworkProxy::NoProxy)
-    {
-        nmgr_.setProxy(CustomProxyService::getProxy());
-    }
 
 	connect(&nmgr_, SIGNAL(sslErrors(QNetworkReply*, const QList<QSslError> &)), this, SLOT(handleSslErrors(QNetworkReply*, const QList<QSslError>&)));
 }
@@ -40,7 +29,8 @@ void HttpRequestHandler::setHeader(const QByteArray& key, const QByteArray& valu
 
 ServerReply HttpRequestHandler::head(QString url, const HttpHeaders& add_headers)
 {
-    ServerReply output;
+	//set proxy
+	setProxyForUrl(url);
 
     //request
 	QNetworkRequest request;
@@ -63,6 +53,7 @@ ServerReply HttpRequestHandler::head(QString url, const HttpHeaders& add_headers
     connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
     loop.exec();
 
+	ServerReply output;
     QList<QByteArray> header_list = reply->rawHeaderList();
     for (int i = 0; i < header_list.size(); i++)
     {
@@ -82,6 +73,9 @@ ServerReply HttpRequestHandler::head(QString url, const HttpHeaders& add_headers
 
 ServerReply HttpRequestHandler::get(QString url, const HttpHeaders& add_headers)
 {
+	//set proxy
+	setProxyForUrl(url);
+
     //request
 	QNetworkRequest request;
 	request.setDecompressedSafetyCheckThreshold(-1);
@@ -144,6 +138,9 @@ ServerReply HttpRequestHandler::get(QString url, const HttpHeaders& add_headers)
 
 ServerReply HttpRequestHandler::put(QString url, const QByteArray& data, const HttpHeaders& add_headers)
 {
+	//set proxy
+	setProxyForUrl(url);
+
 	//request
 	QNetworkRequest request;
 	request.setDecompressedSafetyCheckThreshold(-1);
@@ -184,6 +181,9 @@ ServerReply HttpRequestHandler::put(QString url, const QByteArray& data, const H
 
 ServerReply HttpRequestHandler::post(QString url, const QByteArray& data, const HttpHeaders& add_headers)
 {
+	//set proxy
+	setProxyForUrl(url);
+
     //request
     QNetworkRequest request;
 	request.setDecompressedSafetyCheckThreshold(-1);
@@ -223,6 +223,9 @@ ServerReply HttpRequestHandler::post(QString url, const QByteArray& data, const 
 
 ServerReply HttpRequestHandler::post(QString url, QHttpMultiPart* parts, const HttpHeaders& add_headers)
 {
+	//set proxy
+	setProxyForUrl(url);
+
     //request
 	QNetworkRequest request;
 	request.setDecompressedSafetyCheckThreshold(-1);
@@ -260,6 +263,17 @@ ServerReply HttpRequestHandler::post(QString url, QHttpMultiPart* parts, const H
     return output;
 }
 
+QString HttpRequestHandler::proxyForUrl(QString url)
+{
+	QList<QNetworkProxy> proxies = QNetworkProxyFactory::systemProxyForQuery(QNetworkProxyQuery(url));
+	if (!proxies.isEmpty())
+	{
+		return proxies[0].hostName().toLower().trimmed();
+	}
+
+	return "";
+}
+
 void HttpRequestHandler::handleSslErrors(QNetworkReply* reply, const QList<QSslError>& errors)
 {
 	foreach(const QSslError& error, errors)
@@ -267,6 +281,16 @@ void HttpRequestHandler::handleSslErrors(QNetworkReply* reply, const QList<QSslE
 		qDebug() << "ignore error" << error.errorString();
     }
     reply->ignoreSslErrors(errors);
+}
+
+void HttpRequestHandler::setProxyForUrl(QString url)
+{
+	QList<QNetworkProxy> proxies = QNetworkProxyFactory::systemProxyForQuery(QNetworkProxyQuery(url));
+	if (!proxies.isEmpty())
+	{
+		nmgr_.setProxy(proxies[0]);
+		connect(&nmgr_, &QNetworkAccessManager::proxyAuthenticationRequired, &ProxyCredentialsHandler::instance(), &ProxyCredentialsHandler::proxyAuthenticationRequired);
+	}
 }
 
 QString HttpRequestHandler::networkErrorAsString(QNetworkReply::NetworkError error)

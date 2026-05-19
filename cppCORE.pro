@@ -16,14 +16,12 @@ DEFINES += "CRYPT_KEY=$$CRYPT_KEY"
 
 SOURCES += \
     BarPlot.cpp \
-    CustomProxyService.cpp \
     Exceptions.cpp \
     Histogram.cpp \
     HttpRequestHandler.cpp \
     LinePlot.cpp \
     LoggingWorker.cpp \
     PlotUtils.cpp \
-    ProxyDataService.cpp \
     ScatterPlot.cpp \
     Settings.cpp \
     Log.cpp \
@@ -37,11 +35,11 @@ SOURCES += \
     TSVFileStream.cpp \
     SimpleCrypt.cpp \
     TsvFile.cpp \
-    Git.cpp
+    Git.cpp \
+    ProxyCredentialsHandler.cpp
 
 HEADERS += ToolBase.h \
     BarPlot.h \
-    CustomProxyService.h \
     Exceptions.h \
     GzipStreamDecompressor.h \
     Histogram.h \
@@ -49,7 +47,6 @@ HEADERS += ToolBase.h \
     LinePlot.h \
     LoggingWorker.h \
     PlotUtils.h \
-    ProxyDataService.h \
     ScatterPlot.h \
     Settings.h \
     Log.h \
@@ -62,7 +59,8 @@ HEADERS += ToolBase.h \
     TSVFileStream.h \
     SimpleCrypt.h \
     TsvFile.h \
-    Git.h
+    Git.h \
+    ProxyCredentialsHandler.h
 	
 
 RESOURCES += \

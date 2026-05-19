@@ -3,10 +3,10 @@
 #include <QUrl>
 #include <QFileInfo>
 #include <QDir>
-#include "CustomProxyService.h"
 #include <QEventLoop>
 #include <QNetworkReply>
-#include "Settings.h"
+#include <QNetworkProxyFactory>
+#include "ProxyCredentialsHandler.h"
 
 VersatileFile::VersatileFile(QString file_name, bool stdin_if_empty)
 	: file_name_(file_name)
@@ -22,19 +22,8 @@ VersatileFile::VersatileFile(QString file_name, bool stdin_if_empty)
 		QList<QNetworkProxy> proxies = QNetworkProxyFactory::systemProxyForQuery(QNetworkProxyQuery(QUrl(file_name_)));
 		if (!proxies.isEmpty())
 		{
-			QNetworkProxy proxy = proxies[0];
-			QString proxy_user = Settings::string("proxy_user", true).trimmed();
-			QString proxy_password = Settings::string("proxy_password", true).trimmed();
-			if (!proxy_user.isEmpty() && !proxy_password.isEmpty())
-			{
-				proxy.setUser(proxy_user);
-				proxy.setPassword(proxy_password);
-			}
-			net_mgr_.setProxy(proxy);
-		}
-		if (CustomProxyService::getProxy() != QNetworkProxy::NoProxy)
-		{
-			net_mgr_.setProxy(CustomProxyService::getProxy());
+			net_mgr_.setProxy(proxies[0]);
+			connect(&net_mgr_, &QNetworkAccessManager::proxyAuthenticationRequired, &ProxyCredentialsHandler::instance(), &ProxyCredentialsHandler::proxyAuthenticationRequired);
 		}
 	}
 
@@ -582,4 +571,3 @@ bool VersatileFile::isGzipped()
 	const unsigned char* data = reinterpret_cast<const unsigned char*>(first_two_bytes.constData());
 	return data[0] == 0x1f && data[1] == 0x8b;
 }
-
