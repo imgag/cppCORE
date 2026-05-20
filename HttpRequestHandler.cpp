@@ -286,8 +286,9 @@ void HttpRequestHandler::handleSslErrors(QNetworkReply* reply, const QList<QSslE
 void HttpRequestHandler::setProxyForUrl(QString url)
 {
 	QList<QNetworkProxy> proxies = QNetworkProxyFactory::systemProxyForQuery(QNetworkProxyQuery(url));
-	if (!proxies.isEmpty())
+	if (!proxies.isEmpty() && proxies[0].type()!=QNetworkProxy::NoProxy)
 	{
+		//qDebug() << __FILE__ << __LINE__ << file_name_ << " PROXY: " << proxies[0].hostName();
 		nmgr_.setProxy(proxies[0]);
 		connect(&nmgr_, &QNetworkAccessManager::proxyAuthenticationRequired, &ProxyCredentialsHandler::instance(), &ProxyCredentialsHandler::proxyAuthenticationRequired);
 	}

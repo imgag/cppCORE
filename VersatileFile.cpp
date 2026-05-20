@@ -20,8 +20,9 @@ VersatileFile::VersatileFile(QString file_name, bool stdin_if_empty)
 	if (is_url)
 	{
 		QList<QNetworkProxy> proxies = QNetworkProxyFactory::systemProxyForQuery(QNetworkProxyQuery(QUrl(file_name_)));
-		if (!proxies.isEmpty())
+		if (!proxies.isEmpty() && proxies[0].type()!=QNetworkProxy::NoProxy)
 		{
+			//qDebug() << __FILE__ << __LINE__ << file_name_ << " PROXY: " << proxies[0].hostName() << proxies[0].port();
 			net_mgr_.setProxy(proxies[0]);
 			connect(&net_mgr_, &QNetworkAccessManager::proxyAuthenticationRequired, &ProxyCredentialsHandler::instance(), &ProxyCredentialsHandler::proxyAuthenticationRequired);
 		}
@@ -243,9 +244,14 @@ QByteArray VersatileFile::readAll()
     if (reply->error() == QNetworkReply::NoError)
     {
         data = reply->readAll();
-        cursor_position_ += data.size();
-    }
-    reply->deleteLater();
+		cursor_position_ += data.size();
+	}
+	else
+	{
+		reply->deleteLater();
+		THROW(FileAccessException, "Could not readAll() from " + file_name_ + ": " + reply->errorString());
+	}
+	reply->deleteLater();
 
     // remote file is a compressed file
     if (mode_==URL_GZ)
@@ -525,7 +531,7 @@ QString VersatileFile::fileName() const
 
 QByteArray VersatileFile::httpRangeRequest(qint64 start, qint64 end)
 {
-    QNetworkRequest request((QUrl(file_name_)));
+	QNetworkRequest request((QUrl(file_name_)));
 	request.setDecompressedSafetyCheckThreshold(-1);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     request.setRawHeader("Range", "bytes=" + QByteArray::number(start) + "-" + QByteArray::number(end));
@@ -539,7 +545,12 @@ QByteArray VersatileFile::httpRangeRequest(qint64 start, qint64 end)
     if (reply->error() == QNetworkReply::NoError)
     {
         data = reply->readAll();
-    }
+	}
+	else
+	{
+		reply->deleteLater();
+		THROW(FileAccessException, "Could not readAll() from " + file_name_ + ": " + reply->errorString());
+	}
     reply->deleteLater();
     return data;
 }

@@ -27,7 +27,7 @@ void ProxyCredentialsHandler::proxyAuthenticationRequired(const QNetworkProxy& p
 		QString password = Settings::string("proxy_password", true);
 		if (!user.isEmpty() && !password.isEmpty())
 		{
-			//qDebug() << "ProxyCredentialsHandler::proxyAuthenticationRequired - FROM SETTINGS";
+			//qDebug() << "ProxyCredentialsHandler::proxyAuthenticationRequired - FROM SETTINGS" << user << password;
 			authenticator->setUser(user);
 			authenticator->setPassword(password);
 		}

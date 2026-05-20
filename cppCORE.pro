@@ -30,7 +30,6 @@ SOURCES += \
     FileWatcher.cpp \
     VersatileFile.cpp \
     VersatileTextStream.cpp \
-    WorkerBase.cpp \
     ToolBase.cpp \
     TSVFileStream.cpp \
     SimpleCrypt.cpp \
@@ -55,7 +54,6 @@ HEADERS += ToolBase.h \
     FileWatcher.h \
     VersatileFile.h \
     VersatileTextStream.h \
-    WorkerBase.h \
     TSVFileStream.h \
     SimpleCrypt.h \
     TsvFile.h \
