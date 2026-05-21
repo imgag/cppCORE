@@ -186,7 +186,8 @@ QByteArray VersatileFile::read(qint64 maxlen)
     {
 		qint64 to_read = qMin(chunkSize(), maxlen - result.size());
 		qint64 end_pos = qMin(cursor_position_ + to_read - 1, file_size_ - 1);
-		QByteArray chunk = httpRangeRequest(cursor_position_, end_pos);
+		QByteArray chunk;
+		if (cursor_position_<=end_pos) chunk = httpRangeRequest(cursor_position_, end_pos);
         if (chunk.isEmpty()) break;
 
         result.append(chunk);
