@@ -9,7 +9,8 @@
 #include "ProxyCredentialsHandler.h"
 
 VersatileFile::VersatileFile(QString file_name, bool stdin_if_empty)
-	: file_name_(file_name)
+	: disable_proxy_(false)
+	, file_name_(file_name)
 	, file_stream_pointer_(nullptr)
 	, is_open_(false)
 	, cursor_position_(0)
@@ -17,7 +18,7 @@ VersatileFile::VersatileFile(QString file_name, bool stdin_if_empty)
 	bool is_url = Helper::isHttpUrl(file_name_);
 
 	//set a proxy
-	if (is_url)
+	if (is_url && !disable_proxy_)
 	{
 		QList<QNetworkProxy> proxies = QNetworkProxyFactory::systemProxyForQuery(QNetworkProxyQuery(QUrl(file_name_)));
 		if (!proxies.isEmpty() && proxies[0].type()!=QNetworkProxy::NoProxy)
@@ -120,6 +121,11 @@ bool VersatileFile::open(QIODevice::OpenMode mode, bool throw_on_error)
 QNetworkProxy VersatileFile::proxy() const
 {
 	return net_mgr_.proxy();
+}
+
+void VersatileFile::disableProxy()
+{
+	disable_proxy_ = true;
 }
 
 QIODevice::OpenMode VersatileFile::openMode() const

@@ -49,6 +49,8 @@ public:
 	const HttpHeaders& headers() const;
 	//Adds/overrides a basic header.
 	void setHeader(const QByteArray& key, const QByteArray& value);
+	//Disables automatic proxy determination and by that uses no proxy.
+	void disableProxy();
 
 	//Returns headers for a specific file (needed to get the size of a file without fetching its content)
     ServerReply head(QString url, const HttpHeaders& add_headers);
@@ -74,6 +76,7 @@ private:
 	QString networkErrorAsString(QNetworkReply::NetworkError error);
 	QNetworkAccessManager nmgr_;
 	HttpHeaders headers_;
+	bool disable_proxy_;
 };
 
 #endif // HTTPREQUESTHANDLER_H

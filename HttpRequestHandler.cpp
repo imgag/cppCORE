@@ -9,6 +9,7 @@ HttpRequestHandler::HttpRequestHandler(QObject* parent)
 	: QObject(parent)
 	, nmgr_()
 	, headers_()
+	, disable_proxy_(false)
 {
 	//default headers
 	setHeader("User-Agent", "GSvar");
@@ -25,6 +26,11 @@ const HttpHeaders& HttpRequestHandler::headers() const
 void HttpRequestHandler::setHeader(const QByteArray& key, const QByteArray& value)
 {
 	headers_.insert(key, value);
+}
+
+void HttpRequestHandler::disableProxy()
+{
+	disable_proxy_ = true;
 }
 
 ServerReply HttpRequestHandler::head(QString url, const HttpHeaders& add_headers)
@@ -285,10 +291,12 @@ void HttpRequestHandler::handleSslErrors(QNetworkReply* reply, const QList<QSslE
 
 void HttpRequestHandler::setProxyForUrl(QString url)
 {
+	if (disable_proxy_) return;
+
 	QList<QNetworkProxy> proxies = QNetworkProxyFactory::systemProxyForQuery(QNetworkProxyQuery(url));
 	if (!proxies.isEmpty() && proxies[0].type()!=QNetworkProxy::NoProxy)
 	{
-		//qDebug() << __FILE__ << __LINE__ << file_name_ << " PROXY: " << proxies[0].hostName();
+		//qDebug() << __FILE__ << __LINE__ << url << " PROXY: " << proxies[0].hostName() << proxies[0].port();
 		nmgr_.setProxy(proxies[0]);
 		connect(&nmgr_, &QNetworkAccessManager::proxyAuthenticationRequired, &ProxyCredentialsHandler::instance(), &ProxyCredentialsHandler::proxyAuthenticationRequired);
 	}

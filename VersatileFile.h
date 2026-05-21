@@ -28,6 +28,8 @@ public:
 	bool open(QIODevice::OpenMode mode = QFile::ReadOnly, bool throw_on_error = true);
 	//Returns the proxy used for the current URL.
 	QNetworkProxy proxy() const;
+	//Disables automatic proxy determination and by that uses no proxy.
+	void disableProxy();
 
 	//Returns the open mode (for local files).
 	QIODevice::OpenMode openMode() const;
@@ -66,6 +68,7 @@ public:
 
 private:
     QNetworkAccessManager net_mgr_;
+	bool disable_proxy_;
 	QString file_name_;
 	FILE* file_stream_pointer_;
 	Mode mode_ = LOCAL;
