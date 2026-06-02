@@ -5,13 +5,14 @@
 #include <QString>
 #include <QList>
 #include <QHash>
+#include <QPointF>
 
 // Creates a scatter plot PNG image
 class CPPCORESHARED_EXPORT ScatterPlot
 {
 public:
 	ScatterPlot();
-	void setValues(const QList< std::pair<double,double> >& values, const QList<QString>& colors = QList<QString>())
+	void setValues(const QList<QPointF>& values, const QList<QString>& colors = QList<QString>())
 	{
 		points_.clear();
 		points_.append(values);
@@ -55,7 +56,7 @@ public:
 
 protected:
 	//variables to store the plot data
-	QList<std::pair<double,double>> points_;
+	QList<QPointF> points_;
 	QList<double> vlines_;
 	QList<QString> colors_;
 	QHash<QString,QString> color_legend_;

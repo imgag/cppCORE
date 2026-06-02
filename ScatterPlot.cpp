@@ -29,69 +29,90 @@ void ScatterPlot::store(QString filename)
 		return;
 	}
 
-	if (!yrange_set_)
+	if (!xrange_set_ || !yrange_set_)
 	{
-		double min = std::numeric_limits<double>::max();
-		double max = -std::numeric_limits<double>::max();
+		double xmin = std::numeric_limits<double>::max();
+		double xmax = -std::numeric_limits<double>::max();
+		double ymin = std::numeric_limits<double>::max();
+		double ymax = -std::numeric_limits<double>::max();
 
-		for (const auto& p : points_)
+		for (const QPointF& p : points_)
 		{
-			min = std::min(min, p.second);
-			max = std::max(max, p.second);
+			xmin = std::min(xmin, p.y());
+			xmax = std::max(xmax, p.y());
+			ymin = std::min(ymin, p.x());
+			ymax = std::max(ymax, p.x());
 		}
 
-		ymin_ = min - 0.01 * (max - min);
-		ymax_ = max + 0.01 * (max - min);
-	}
-
-	if (!xrange_set_)
-	{
-		double min = std::numeric_limits<double>::max();
-		double max = -std::numeric_limits<double>::max();
-
-		for (const auto& p : points_)
+		if (!xrange_set_)
 		{
-			min = std::min(min, p.first);
-			max = std::max(max, p.first);
+			xmin_ = xmin-0.01*(xmax-xmin);
+			xmax_ = xmax+0.01*(xmax-xmin);
 		}
-
-		xmin_ = min-0.01*(max-min);
-		xmax_ = max+0.01*(max-min);
+		if (!yrange_set_)
+		{
+			ymin_ = ymin-0.01*(ymax - ymin);
+			ymax_ = ymax+0.01*(ymax - ymin);
+		}
 	}
 
 	PlotUtils* plot_utils = new PlotUtils();
 	QChart* chart = plot_utils->getChart();
 	chart->legend()->setVisible(color_legend_.count() > 0);
 
-	// group by color (Qt needs one series per color for legend support)
-	QMap<QString, QScatterSeries*> series_by_color;
+	// group by color
+	QHash<QString, QList<QPointF>> grouped;
+	grouped.reserve(color_legend_.size());
 	for (int i=0; i<points_.size(); ++i)
 	{
-		const auto& p = points_[i];
 		QString color = (colors_.size() > i) ? colors_[i] : "black";
+		grouped[color].append(points_[i]);
+	}
 
-		if (!series_by_color.contains(color))
+	for (auto it = grouped.begin(); it != grouped.end(); ++it)
+	{
+		auto* s = new QScatterSeries();
+		s->setMarkerSize(6.0);
+		s->setColor(QColor::fromString(it.key()));
+
+		if (color_legend_.contains(it.key()))
 		{
-			auto* s = new QScatterSeries();
-			s->setMarkerSize(6.0);
-			s->setColor(QColor::fromString(color));
-
-			// legend label if available
-			if (color_legend_.contains(color))
-			{
-				s->setName(color_legend_[color]);
-			}
-			else
-			{
-				s->setName("");
-			}
-
-			chart->addSeries(s);
-			series_by_color[color] = s;
+			s->setName(color_legend_[it.key()]);
 		}
 
-		series_by_color[color]->append(p.first, p.second);
+		s->append(it.value());
+		chart->addSeries(s);
 	}
+
+	// group by color (Qt needs one series per color for legend support)
+	// QMap<QString, QScatterSeries*> series_by_color;
+	// for (int i=0; i<points_.size(); ++i)
+	// {
+	// 	const QPointF& p = points_[i];
+	// 	QString color = (colors_.size() > i) ? colors_[i] : "black";
+
+	// 	if (!series_by_color.contains(color))
+	// 	{
+	// 		auto* s = new QScatterSeries();
+	// 		s->setMarkerSize(6.0);
+	// 		s->setColor(QColor::fromString(color));
+
+	// 		// legend label if available
+	// 		if (color_legend_.contains(color))
+	// 		{
+	// 			s->setName(color_legend_[color]);
+	// 		}
+	// 		else
+	// 		{
+	// 			s->setName("");
+	// 		}
+
+	// 		chart->addSeries(s);
+	// 		series_by_color[color] = s;
+	// 	}
+
+	// 	series_by_color[color]->append(p.x(), p.y());
+	// }
 
 	// vertical lines
 	for (double x : vlines_)
