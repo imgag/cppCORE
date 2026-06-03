@@ -79,40 +79,14 @@ void ScatterPlot::store(QString filename)
 		{
 			s->setName(color_legend_[it.key()]);
 		}
+		else
+		{
+			s->setName("");
+		}
 
 		s->append(it.value());
 		chart->addSeries(s);
 	}
-
-	// group by color (Qt needs one series per color for legend support)
-	// QMap<QString, QScatterSeries*> series_by_color;
-	// for (int i=0; i<points_.size(); ++i)
-	// {
-	// 	const QPointF& p = points_[i];
-	// 	QString color = (colors_.size() > i) ? colors_[i] : "black";
-
-	// 	if (!series_by_color.contains(color))
-	// 	{
-	// 		auto* s = new QScatterSeries();
-	// 		s->setMarkerSize(6.0);
-	// 		s->setColor(QColor::fromString(color));
-
-	// 		// legend label if available
-	// 		if (color_legend_.contains(color))
-	// 		{
-	// 			s->setName(color_legend_[color]);
-	// 		}
-	// 		else
-	// 		{
-	// 			s->setName("");
-	// 		}
-
-	// 		chart->addSeries(s);
-	// 		series_by_color[color] = s;
-	// 	}
-
-	// 	series_by_color[color]->append(p.x(), p.y());
-	// }
 
 	// vertical lines
 	for (double x : vlines_)
