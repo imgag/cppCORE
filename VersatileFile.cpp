@@ -100,7 +100,7 @@ bool VersatileFile::open(QIODevice::OpenMode mode, bool throw_on_error)
 	{
 		gz_stream_ = gzopen(file_name_.toUtf8().data(), "rb"); //read binary: always open in binary mode because Windows and Mac open in text mode
 		if (!gz_stream_) opened = false;
-        gz_buffer_ = new char[gz_buffer_size_];
+		gz_buffer_ = new char[gz_buffer_size_];
 		gzbuffer(gz_stream_, gz_buffer_size_internal_);
 	}
 	else
@@ -299,21 +299,25 @@ QByteArray VersatileFile::readLine(bool trim_line_endings)
 	}
 	else if (mode_==LOCAL_GZ)
 	{
-        // get next line
-		char* char_array = gzgets(gz_stream_, gz_buffer_, gz_buffer_size_);
-
-		//handle errors like truncated GZ file
-		if (char_array==nullptr)
+		while(true)
 		{
-			int error_no = Z_OK;
-			QByteArray error_message = gzerror(gz_stream_, &error_no);
-			if (error_no!=Z_OK && error_no!=Z_STREAM_END)
-			{
-				THROW(FileParseException, "Error while reading file '" + file_name_ + "': " + error_message);
-			}
-		}
+			char* char_array = gzgets(gz_stream_, gz_buffer_, gz_buffer_size_);
 
-        output = QByteArray(char_array);
+			//handle EOL and errors like truncated GZ file
+			if (char_array==nullptr)
+			{
+				int error_no = Z_OK;
+				QByteArray error_message = gzerror(gz_stream_, &error_no);
+				if (error_no!=Z_OK && error_no!=Z_STREAM_END)
+				{
+					THROW(FileParseException, "Error while reading file '" + file_name_ + "': " + error_message);
+				}
+				break;
+			}
+
+			output.append(char_array);
+			if (output.endsWith('\n')) break;
+		}
 	}
 	else if (mode_==URL_GZ)
 	{
