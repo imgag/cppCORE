@@ -33,6 +33,13 @@ struct CPPCORESHARED_EXPORT ServerReply
     int status_code = 200;
     QMap<QByteArray, QByteArray> headers;
     QByteArray body;
+
+	void clear()
+	{
+		status_code = 200;
+		headers.clear();
+		body.clear();
+	}
 };
 
 //Helper class for HTTP(S) communication
@@ -71,12 +78,9 @@ private slots:
 	void handleSslErrors(QNetworkReply*, const QList<QSslError>&);
 
 private:
-	//determines proxy host for a given URL and adds proxy credentials handler
-	void setProxyForUrl(QString url);
 	QString networkErrorAsString(QNetworkReply::NetworkError error);
 	QNetworkAccessManager nmgr_;
 	HttpHeaders headers_;
-	bool disable_proxy_;
 };
 
 #endif // HTTPREQUESTHANDLER_H

@@ -9,13 +9,15 @@ HttpRequestHandler::HttpRequestHandler(QObject* parent)
 	: QObject(parent)
 	, nmgr_()
 	, headers_()
-	, disable_proxy_(false)
 {
-	//default headers
-	setHeader("User-Agent", "GSvar");
-	setHeader("X-Custom-User-Agent", "GSvar");
+	headers_.insert("User-Agent", "GSvar");
 
+	//SSL error handling
 	connect(&nmgr_, SIGNAL(sslErrors(QNetworkReply*, const QList<QSslError> &)), this, SLOT(handleSslErrors(QNetworkReply*, const QList<QSslError>&)));
+
+	//proxy handling
+	QNetworkProxyFactory::setUseSystemConfiguration(true);
+	connect(&nmgr_, &QNetworkAccessManager::proxyAuthenticationRequired, &ProxyCredentialsHandler::instance(), &ProxyCredentialsHandler::proxyAuthenticationRequired, Qt::DirectConnection);
 }
 
 const HttpHeaders& HttpRequestHandler::headers() const
@@ -28,16 +30,8 @@ void HttpRequestHandler::setHeader(const QByteArray& key, const QByteArray& valu
 	headers_.insert(key, value);
 }
 
-void HttpRequestHandler::disableProxy()
-{
-	disable_proxy_ = true;
-}
-
 ServerReply HttpRequestHandler::head(QString url, const HttpHeaders& add_headers)
 {
-	//set proxy
-	setProxyForUrl(url);
-
     //request
 	QNetworkRequest request;
 	request.setDecompressedSafetyCheckThreshold(-1);
@@ -52,36 +46,30 @@ ServerReply HttpRequestHandler::head(QString url, const HttpHeaders& add_headers
     }
 
     //query
-    QNetworkReply* reply = nmgr_.head(request);
+	QScopedPointer<QNetworkReply> reply(nmgr_.head(request));
 
     //make the loop process the reply immediately
     QEventLoop loop;
-    connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
+	connect(reply.data(), SIGNAL(finished()), &loop, SLOT(quit()));
     loop.exec();
 
 	ServerReply output;
-    QList<QByteArray> header_list = reply->rawHeaderList();
-    for (int i = 0; i < header_list.size(); i++)
-    {
-        output.headers.insert(header_list[i], reply->rawHeader(header_list[i]));
-    }
-
+	for (const QByteArray& line : reply->rawHeaderList())
+	{
+		output.headers.insert(line, reply->rawHeader(line));
+	}
     output.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-
+	output.body = reply->readAll();
     if (reply->error()!=QNetworkReply::NoError)
     {
         THROW_HTTP(HttpException, "HTTP Error: " + networkErrorAsString(reply->error()) + "\nIODevice Error: " + reply->errorString(), output.status_code, output.headers, output.body);
     }
 
-    reply->deleteLater();
     return output;
 }
 
 ServerReply HttpRequestHandler::get(QString url, const HttpHeaders& add_headers)
 {
-	//set proxy
-	setProxyForUrl(url);
-
     //request
 	QNetworkRequest request;
 	request.setDecompressedSafetyCheckThreshold(-1);
@@ -94,59 +82,45 @@ ServerReply HttpRequestHandler::get(QString url, const HttpHeaders& add_headers)
     {
         request.setRawHeader(it.key(), it.value());
     }
-    request.setRawHeader("User-Agent", "Qt NetworkAccess 1.3");
-    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, true);
+	request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
 
     ServerReply output;
-    int retry_attempts = 5;
-    bool needs_retry = false;
-    for (int i = 0; i < retry_attempts; i++)
+	const int max_retry_attempts = 5;
+	for (int i=1; i<=max_retry_attempts; ++i)
     {
         //query
-        QNetworkReply* reply = nmgr_.get(request);
+		QScopedPointer<QNetworkReply> reply(nmgr_.get(request));
+		reply->setReadBufferSize(0);
 
         //make the loop process the reply immediately
         QEventLoop loop;
-        connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
+		connect(reply.data(), SIGNAL(finished()), &loop, SLOT(quit()));
         loop.exec();
 
-        //output
-        reply->setReadBufferSize(0);
-        QList<QByteArray> header_list = reply->rawHeaderList();
-
-        output = ServerReply{};
-        for (int i = 0; i < header_list.size(); i++)
+		//output
+		output.clear();
+		for (const QByteArray& line: reply->rawHeaderList())
         {
-            output.headers.insert(header_list[i], reply->rawHeader(header_list[i]));
+			output.headers.insert(line, reply->rawHeader(line));
         }
         output.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         output.body = reply->readAll();
-        if ((reply->error()!=QNetworkReply::NoError) && (reply->error()!=QNetworkReply::RemoteHostClosedError))
+		if (reply->error()!=QNetworkReply::NoError && reply->error()!=QNetworkReply::RemoteHostClosedError)
         {
-            if (i == retry_attempts - 1)
+			if (i == max_retry_attempts)
             {
 				THROW_HTTP(HttpException, "HTTP Error: " + networkErrorAsString(reply->error()) + "\nDevice Error: " + reply->errorString()+ "\nReply: " + output.body, output.status_code, output.headers, output.body);
-            }
-            else
-            {
-                needs_retry = true;
-            }
+			}
+			else continue;
         }
 
-        reply->deleteLater();
-        if (!needs_retry)
-        {
-            break;
-        }
+		break;
     }
     return output;
 }
 
 ServerReply HttpRequestHandler::put(QString url, const QByteArray& data, const HttpHeaders& add_headers)
 {
-	//set proxy
-	setProxyForUrl(url);
-
 	//request
 	QNetworkRequest request;
 	request.setDecompressedSafetyCheckThreshold(-1);
@@ -161,35 +135,31 @@ ServerReply HttpRequestHandler::put(QString url, const QByteArray& data, const H
 	}
 
 	//query
-	QNetworkReply* reply = nmgr_.put(request, data);
+	QScopedPointer<QNetworkReply> reply(nmgr_.put(request, data));
 
 	//make the loop process the reply immediately
 	QEventLoop loop;
-	connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
+	connect(reply.data(), SIGNAL(finished()), &loop, SLOT(quit()));
 	loop.exec();
 
     //output
     ServerReply output;
-    for (int i = 0; i < reply->rawHeaderList().size(); i++)
-    {
-        output.headers.insert(reply->rawHeaderList()[i], reply->rawHeader(reply->rawHeaderList()[i]));
-    }
+	for (const QByteArray& line : reply->rawHeaderList())
+	{
+		output.headers.insert(line, reply->rawHeader(line));
+	}
     output.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     output.body = reply->readAll();
-
     if (reply->error()!=QNetworkReply::NoError)
     {
         THROW_HTTP(HttpException, "HTTP Error: " + networkErrorAsString(reply->error()) + "\nIODevice Error: " + reply->errorString(), output.status_code, output.headers, output.body);
 	}
-    reply->deleteLater();
+
     return output;
 }
 
 ServerReply HttpRequestHandler::post(QString url, const QByteArray& data, const HttpHeaders& add_headers)
 {
-	//set proxy
-	setProxyForUrl(url);
-
     //request
     QNetworkRequest request;
 	request.setDecompressedSafetyCheckThreshold(-1);
@@ -204,34 +174,31 @@ ServerReply HttpRequestHandler::post(QString url, const QByteArray& data, const 
     }
 
     //query
-	QNetworkReply* reply = nmgr_.post(request, data);
+	QScopedPointer<QNetworkReply> reply(nmgr_.post(request, data));
 
     //make the loop process the reply immediately
     QEventLoop loop;
-    connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
+	connect(reply.data(), SIGNAL(finished()), &loop, SLOT(quit()));
     loop.exec();
 
     //output
     ServerReply output;
-    for (int i = 0; i < reply->rawHeaderList().size(); i++)
-    {
-        output.headers.insert(reply->rawHeaderList()[i], reply->rawHeader(reply->rawHeaderList()[i]));
-    }
+	for (const QByteArray& line : reply->rawHeaderList())
+	{
+		output.headers.insert(line, reply->rawHeader(line));
+	}
     output.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 	output.body = reply->readAll();
     if (reply->error()!=QNetworkReply::NoError)
     {
 		THROW_HTTP(HttpException, "HTTP Error: " + networkErrorAsString(reply->error()) + "\nDevice error: " + reply->errorString() + "\nReply: " + output.body, output.status_code, output.headers, output.body);
     }
-    reply->deleteLater();
+
     return output;
 }
 
 ServerReply HttpRequestHandler::post(QString url, QHttpMultiPart* parts, const HttpHeaders& add_headers)
 {
-	//set proxy
-	setProxyForUrl(url);
-
     //request
 	QNetworkRequest request;
 	request.setDecompressedSafetyCheckThreshold(-1);
@@ -246,26 +213,26 @@ ServerReply HttpRequestHandler::post(QString url, QHttpMultiPart* parts, const H
     }
 
     //query
-    QNetworkReply* reply = nmgr_.post(request, parts);
+	QScopedPointer<QNetworkReply> reply(nmgr_.post(request, parts));
 
     //make the loop process the reply immediately
     QEventLoop loop;
-    connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
+	connect(reply.data(), SIGNAL(finished()), &loop, SLOT(quit()));
     loop.exec();
 
     //output
     ServerReply output;
-    for (int i = 0; i < reply->rawHeaderList().size(); i++)
-    {
-        output.headers.insert(reply->rawHeaderList()[i], reply->rawHeader(reply->rawHeaderList()[i]));
-    }
+	for (const QByteArray& line : reply->rawHeaderList())
+	{
+		output.headers.insert(line, reply->rawHeader(line));
+	}
     output.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     output.body = reply->readAll();
     if (reply->error()!=QNetworkReply::NoError)
     {
         THROW_HTTP(HttpException, "HTTP Error: " + networkErrorAsString(reply->error()) + "\nIODevice Error: " + reply->errorString(), output.status_code, output.headers, output.body);
     }
-    reply->deleteLater();
+
     return output;
 }
 
@@ -287,19 +254,6 @@ void HttpRequestHandler::handleSslErrors(QNetworkReply* reply, const QList<QSslE
 		qDebug() << "ignore error" << error.errorString();
     }
     reply->ignoreSslErrors(errors);
-}
-
-void HttpRequestHandler::setProxyForUrl(QString url)
-{
-	if (disable_proxy_) return;
-
-	QList<QNetworkProxy> proxies = QNetworkProxyFactory::systemProxyForQuery(QNetworkProxyQuery(url));
-	if (!proxies.isEmpty() && proxies[0].type()!=QNetworkProxy::NoProxy)
-	{
-		//qDebug() << __FILE__ << __LINE__ << url << " PROXY: " << proxies[0].hostName() << proxies[0].port();
-		nmgr_.setProxy(proxies[0]);
-		connect(&nmgr_, &QNetworkAccessManager::proxyAuthenticationRequired, &ProxyCredentialsHandler::instance(), &ProxyCredentialsHandler::proxyAuthenticationRequired);
-	}
 }
 
 QString HttpRequestHandler::networkErrorAsString(QNetworkReply::NetworkError error)

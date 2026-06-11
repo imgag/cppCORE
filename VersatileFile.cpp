@@ -9,24 +9,18 @@
 #include "ProxyCredentialsHandler.h"
 
 VersatileFile::VersatileFile(QString file_name, bool stdin_if_empty)
-	: disable_proxy_(false)
-	, file_name_(file_name)
+	: file_name_(file_name)
 	, file_stream_pointer_(nullptr)
 	, is_open_(false)
 	, cursor_position_(0)
 {
 	bool is_url = Helper::isHttpUrl(file_name_);
 
-	//set a proxy
-	if (is_url && !disable_proxy_)
+	//proxy handling
+	if (is_url)
 	{
-		QList<QNetworkProxy> proxies = QNetworkProxyFactory::systemProxyForQuery(QNetworkProxyQuery(QUrl(file_name_)));
-		if (!proxies.isEmpty() && proxies[0].type()!=QNetworkProxy::NoProxy)
-		{
-			//qDebug() << __FILE__ << __LINE__ << file_name_ << " PROXY: " << proxies[0].hostName() << proxies[0].port();
-			net_mgr_.setProxy(proxies[0]);
-			connect(&net_mgr_, &QNetworkAccessManager::proxyAuthenticationRequired, &ProxyCredentialsHandler::instance(), &ProxyCredentialsHandler::proxyAuthenticationRequired);
-		}
+		QNetworkProxyFactory::setUseSystemConfiguration(true);
+		connect(&net_mgr_, &QNetworkAccessManager::proxyAuthenticationRequired, &ProxyCredentialsHandler::instance(), &ProxyCredentialsHandler::proxyAuthenticationRequired, Qt::DirectConnection);
 	}
 
 	//determine mode
@@ -58,9 +52,9 @@ VersatileFile::VersatileFile(QString file_name, bool stdin_if_empty)
 		request.setDecompressedSafetyCheckThreshold(-1);
 		request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
 
-		QNetworkReply* reply = net_mgr_.head(request);
+		QScopedPointer<QNetworkReply> reply(net_mgr_.head(request));
 		QEventLoop loop;
-		QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+		QObject::connect(reply.data(), &QNetworkReply::finished, &loop, &QEventLoop::quit);
 		loop.exec();
 
 		file_exists_ = (reply->error() == QNetworkReply::NoError);
@@ -68,7 +62,6 @@ VersatileFile::VersatileFile(QString file_name, bool stdin_if_empty)
 		{
 			file_size_ = reply->header(QNetworkRequest::ContentLengthHeader).toLongLong();
 		}
-		reply->deleteLater();
 	}
 }
 
@@ -121,11 +114,6 @@ bool VersatileFile::open(QIODevice::OpenMode mode, bool throw_on_error)
 QNetworkProxy VersatileFile::proxy() const
 {
 	return net_mgr_.proxy();
-}
-
-void VersatileFile::disableProxy()
-{
-	disable_proxy_ = true;
 }
 
 QIODevice::OpenMode VersatileFile::openMode() const
@@ -241,10 +229,10 @@ QByteArray VersatileFile::readAll()
     QNetworkRequest request((QUrl(file_name_)));
 	request.setDecompressedSafetyCheckThreshold(-1);
 	request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-    QNetworkReply* reply = net_mgr_.get(request);
+	QScopedPointer<QNetworkReply> reply(net_mgr_.get(request));
 
     QEventLoop loop;
-    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+	QObject::connect(reply.data(), &QNetworkReply::finished, &loop, &QEventLoop::quit);
     loop.exec();
 
     QByteArray data;
@@ -255,10 +243,8 @@ QByteArray VersatileFile::readAll()
 	}
 	else
 	{
-		reply->deleteLater();
 		THROW(FileAccessException, "Could not readAll() from " + file_name_ + ": " + reply->errorString());
 	}
-	reply->deleteLater();
 
     // remote file is a compressed file
     if (mode_==URL_GZ)
@@ -549,9 +535,9 @@ QByteArray VersatileFile::httpRangeRequest(qint64 start, qint64 end)
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     request.setRawHeader("Range", "bytes=" + QByteArray::number(start) + "-" + QByteArray::number(end));
 
-    QNetworkReply* reply = net_mgr_.get(request);
+	QScopedPointer<QNetworkReply> reply(net_mgr_.get(request));
     QEventLoop loop;
-    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+	QObject::connect(reply.data(), &QNetworkReply::finished, &loop, &QEventLoop::quit);
     loop.exec();
 
     QByteArray data;
@@ -561,10 +547,9 @@ QByteArray VersatileFile::httpRangeRequest(qint64 start, qint64 end)
 	}
 	else
 	{
-		reply->deleteLater();
 		THROW(FileAccessException, "Could not readAll() from " + file_name_ + ": " + reply->errorString());
 	}
-    reply->deleteLater();
+
     return data;
 }
 

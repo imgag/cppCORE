@@ -68,7 +68,6 @@ public:
 
 private:
     QNetworkAccessManager net_mgr_;
-	bool disable_proxy_;
 	QString file_name_;
 	FILE* file_stream_pointer_;
 	Mode mode_ = LOCAL;
