@@ -12,6 +12,10 @@ HttpRequestHandler::HttpRequestHandler(QObject* parent)
 {
 	headers_.insert("User-Agent", "GSvar");
 
+	//basic authentification
+	connect(&nmgr_, &QNetworkAccessManager::authenticationRequired, this, &HttpRequestHandler::authenticationRequired, Qt::DirectConnection);
+
+
 	//SSL error handling
 	connect(&nmgr_, SIGNAL(sslErrors(QNetworkReply*, const QList<QSslError> &)), this, SLOT(handleSslErrors(QNetworkReply*, const QList<QSslError>&)));
 
@@ -28,6 +32,12 @@ const HttpHeaders& HttpRequestHandler::headers() const
 void HttpRequestHandler::setHeader(const QByteArray& key, const QByteArray& value)
 {
 	headers_.insert(key, value);
+}
+
+void HttpRequestHandler::setCredentials(QString user, QString password)
+{
+	user_ = user;
+	password_ = password;
 }
 
 ServerReply HttpRequestHandler::head(QString url, const HttpHeaders& add_headers)
@@ -254,6 +264,14 @@ void HttpRequestHandler::handleSslErrors(QNetworkReply* reply, const QList<QSslE
 		qDebug() << "ignore error" << error.errorString();
     }
     reply->ignoreSslErrors(errors);
+}
+
+void HttpRequestHandler::authenticationRequired(QNetworkReply* reply, QAuthenticator* authenticator)
+{
+	if (user_.isEmpty() && password_.isEmpty()) THROW(NetworkException, "Basic authtification reqested, but no credentials set for URL: " + reply->url().toString());
+
+	authenticator->setUser(user_);
+	authenticator->setPassword(password_);
 }
 
 QString HttpRequestHandler::networkErrorAsString(QNetworkReply::NetworkError error)

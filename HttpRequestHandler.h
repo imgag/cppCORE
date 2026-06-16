@@ -59,6 +59,9 @@ public:
 	//Disables automatic proxy determination and by that uses no proxy.
 	void disableProxy();
 
+	//Sets user/password for basic authentication
+	void setCredentials(QString user, QString password);
+
 	//Returns headers for a specific file (needed to get the size of a file without fetching its content)
     ServerReply head(QString url, const HttpHeaders& add_headers);
 	//Performs GET request
@@ -76,11 +79,15 @@ public:
 private slots:
 	//Handles SSL errors (by ignoring them)
 	void handleSslErrors(QNetworkReply*, const QList<QSslError>&);
+	//Handler for basic authentication. Throws an exception if called and no credentials were provided.
+	void authenticationRequired(QNetworkReply* reply, QAuthenticator* authenticator);
 
 private:
 	QString networkErrorAsString(QNetworkReply::NetworkError error);
 	QNetworkAccessManager nmgr_;
 	HttpHeaders headers_;
+	QString user_;
+	QString password_;
 };
 
 #endif // HTTPREQUESTHANDLER_H
