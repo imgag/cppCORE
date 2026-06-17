@@ -7,8 +7,10 @@ TARGET = cppCORE
 DEFINES += CPPCORE_LIBRARY
 
 #compose version string
-SVN_VER= \\\"$$system(cd .. && git describe --tags)\\\"
-DEFINES += "CPPCORE_VERSION=$$SVN_VER"
+GIT_VERSION = \\\"$$system(cd .. && git describe --tags)\\\"
+DEFINES += "GIT_VERSION=$$GIT_VERSION"
+GIT_DATE = \\\"$$system(cd .. && git log -1 --format=%cs)\\\"
+DEFINES += "GIT_DATE=$$GIT_DATE"
 
 #get decryption key
 CRYPT_KEY= \\\"$$cat("CRYPT_KEY.txt", lines)\\\"

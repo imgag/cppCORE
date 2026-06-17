@@ -26,7 +26,12 @@ void ToolBase::setExitErrorState(bool exit_error_state)
 
 QString ToolBase::version()
 {
-	return QString(CPPCORE_VERSION);
+	return QString(GIT_VERSION);
+}
+
+QString ToolBase::date()
+{
+	return QString(GIT_DATE);
 }
 
 qulonglong ToolBase::encryptionKey(QString context)

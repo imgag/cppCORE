@@ -34,8 +34,10 @@ public:
 	virtual void main() = 0;
 	///Starts the event loop and excutes the setup() and main() methods.
 	int execute();
-	///Returns the application version
+	///Returns the application version (last GIT commit)
 	static QString version();
+	///Returns the application date format YYYY-MM-DD (date of the last GIT commit)
+	static QString date();
 	///Returns the encryption key as an integer. Throws a ProgrammingException if it is not present/valid.
 	static qulonglong encryptionKey(QString context);
 
