@@ -267,9 +267,11 @@ int Helper::levenshtein(const QString& s1, const QString& s2)
 	return prevCol[len2];
 }
 
-QString Helper::userName()
+QString Helper::userName(bool to_lower)
 {
-	return qgetenv(isWindows() ? "USERNAME" : "USER");
+	QString username = qgetenv(isWindows() ? "USERNAME" : "USER");
+	if (to_lower) username = username.toLower();
+	return username.trimmed();
 }
 
 QString Helper::dateTime(QString format)

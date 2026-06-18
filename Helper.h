@@ -124,8 +124,8 @@ public:
 	///Returns the Levenshtein-distance of two strings.
 	static int levenshtein(const QString& s1, const QString& s2);
 
-	///Gets the user name of the current user from the environment variables.
-	static QString userName();
+	///Gets the user name of the current user from the environment variables. By default converts the user name to lower-case.
+	static QString userName(bool to_lower=true);
 
 	///Returns the current date and time in the given format. If the format is a empty string, the ISO format "yyyy-MM-ddTHH:mm:ss" is returned.
 	static QString dateTime(QString format = "dd.MM.yyyy hh:mm:ss");
