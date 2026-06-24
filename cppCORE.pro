@@ -1,7 +1,7 @@
 include("../lib.pri")
 
 #base settings
-QT       += gui widgets charts
+QT += gui widgets charts httpserver
 QT += network
 TARGET = cppCORE
 DEFINES += CPPCORE_LIBRARY
