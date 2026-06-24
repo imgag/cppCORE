@@ -18,6 +18,7 @@ DEFINES += "CRYPT_KEY=$$CRYPT_KEY"
 
 SOURCES += \
     BarPlot.cpp \
+    BasicServer.cpp \
     Exceptions.cpp \
     Histogram.cpp \
     HttpRequestHandler.cpp \
@@ -41,6 +42,7 @@ SOURCES += \
 
 HEADERS += ToolBase.h \
     BarPlot.h \
+    BasicServer.h \
     Exceptions.h \
     GzipStreamDecompressor.h \
     Histogram.h \
