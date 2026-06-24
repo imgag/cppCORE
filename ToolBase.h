@@ -7,7 +7,7 @@
 #include <QVector>
 #include <QVariant>
 #include <QDate>
-#include <limits>
+#include <QElapsedTimer>
 
 ///Base class for command-line tools that handles parameter parsing and uncaught exceptions
 class CPPCORESHARED_EXPORT ToolBase
@@ -152,6 +152,14 @@ private:
 		qputenv("QT_QPA_PLATFORM", "offscreen");
 		return argc;
 	}
+
+protected:
+	bool debug_;
+	QElapsedTimer debug_timer_;
+	QTextStream debug_stream_;
+
+	//Print execution time for a step.
+	void printTime(QString step, bool restart=true);
 };
 
 #endif //TOOLBASE_H

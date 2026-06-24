@@ -10,6 +10,9 @@ ToolBase::ToolBase(int& argc, char *argv[])
 	: QApplication(setOffscreen(argc), argv)
 	, exit_event_loop_(true)
 	, exit_error_state_(false)
+	, debug_(false)
+	, debug_timer_()
+	, debug_stream_(stdout)
 {
 	QApplication::setApplicationVersion(version());
 }
@@ -561,6 +564,7 @@ void ToolBase::executeInternal()
 	bool execute_main = parseCommandLine();
 	if (execute_main)
 	{
+		debug_timer_.start();
 		main();
 	}
 
@@ -769,6 +773,13 @@ bool ToolBase::notify(QObject* receiver, QEvent* event)
 	}
 
 	return false;
+}
+
+void ToolBase::printTime(QString step, bool restart)
+{
+	if (!debug_) return;
+	debug_stream_ << "Execution time of '" << step << "': " << Helper::elapsedTime(debug_timer_) << Qt::endl;
+	if (restart) debug_timer_.restart();
 }
 
 
