@@ -189,6 +189,64 @@ public:
 	///Convert Date/Time to ISO date (without timezone). Uses the given separator of date and time.
 	static QByteArray toString(const QDateTime& datetime, char sep='T');
 
+	///Fast splitting of QByteArray by avoiding the overhead of creating a sub-strings as QByteArray
+	static QList<QByteArrayView> fastSplit(const QByteArray& line, char sep)
+	{
+		QList<QByteArrayView> output;
+
+		const char* data = line.constData();
+		qsizetype start = 0;
+		for (qsizetype i=0; i<line.size(); ++i)
+		{
+			if (data[i]==sep)
+			{
+				output << QByteArrayView(data + start, i-start);
+				start = i + 1;
+			}
+		}
+		output << QByteArrayView(data+start, line.size()-start);
+
+		return output;
+	}
+
+	static int fastSplit(const QByteArray& line, char sep, QList<QByteArrayView>& parts)
+	{
+		const char* data = line.constData();
+		qsizetype start = 0;
+		qsizetype col = 0;
+		for (qsizetype i=0; i<line.size(); ++i)
+		{
+			if (data[i]==sep)
+			{
+				if (col>=parts.size()) parts.resize(col+1);
+				parts[col++] = QByteArrayView(data + start, i-start);
+				start = i + 1;
+			}
+		}
+		parts[col++] = QByteArrayView(data+start, line.size()-start);
+		parts.resize(col);
+		return col;
+	}
+
+	///Fast splitting of QByteArrayView by avoiding the overhead of creating a sub-strings as QByteArray
+	static QList<QByteArrayView> fastSplit(QByteArrayView line, char sep)
+	{
+		QList<QByteArrayView> output;
+
+		const char* data = line.data();
+		qsizetype start = 0;
+		for (qsizetype i = 0; i < line.size(); ++i)
+		{
+			if (data[i] == sep)
+			{
+				output << QByteArrayView(data + start, i - start);
+				start = i + 1;
+			}
+		}
+		output << QByteArrayView(data + start, line.size() - start);
+
+		return output;
+	}
 
 protected:
 	///Constructor declared away.
