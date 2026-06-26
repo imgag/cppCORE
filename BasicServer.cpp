@@ -26,9 +26,6 @@ void BasicServer::setupDefaultRoutes()
 	#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
 	http_server.setMissingHandler(this, [] (const QHttpServerRequest &req, QHttpServerResponder & resp)
 	{
-		Log::error(req.url().path());
-		Log::error(req.url().fileName());
-		Log::error("Wrong URL");
 		resp.sendResponse(QHttpServerResponse("text/plain", "You are trying to open the address that does not exist", QHttpServerResponder::StatusCode::NotFound));
 	});
 	#endif
