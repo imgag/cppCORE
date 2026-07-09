@@ -65,7 +65,7 @@ void LinePlot::store(QString filename)
 		}
 	}
 
-	PlotUtils* plot_utils = new PlotUtils();
+	PlotUtils* plot_utils = new PlotUtils(); //TODO Alexandr: check for memory leaks everywhere in your code
 	QChart* chart = plot_utils->getChart();
 
 	// create axes
@@ -73,13 +73,14 @@ void LinePlot::store(QString filename)
 	if (!xlabel_.isEmpty()) axis_x->setTitleText(xlabel_);
 	double xmin = std::numeric_limits<double>::max();
 	double xmax = -std::numeric_limits<double>::max();
-	for (double value : xvalues_)
+	for (double value : std::as_const(xvalues_))
 	{
 		xmin = std::min(value, xmin);
 		xmax = std::max(value, xmax);
 	}
 	if (xvalues_.isEmpty())
 	{
+		qDebug() << "No X values are set for LinePlot - using Y values as range";
 		xmin = ymin_;
 		xmax = ymax_;
 	}
