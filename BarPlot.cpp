@@ -1,7 +1,6 @@
 #include "BarPlot.h"
 
 #include <limits>
-#include <QChartView>
 #include <QBarCategoryAxis>
 #include <QValueAxis>
 #include <QLegend>
@@ -51,8 +50,7 @@ void BarPlot::store(QString filename)
 	int width = 1000;
 	int height = 400;
 
-	PlotUtils* plot_utils = new PlotUtils();
-	QChart* chart = plot_utils->getChart();
+	PlotUtils plot_utils = PlotUtils();
 
 	QValueAxis* axis_x = new QValueAxis();
 	// axis_x->setRange(0, bars_.size());
@@ -90,12 +88,12 @@ void BarPlot::store(QString filename)
 		axis_y->setRange(0, ymax * 1.1);
 	}
 
-	chart->addAxis(axis_x, Qt::AlignBottom);
-	chart->addAxis(axis_y, Qt::AlignLeft);
-	chart->legend()->hide();
+	plot_utils.chart().addAxis(axis_x, Qt::AlignBottom);
+	plot_utils.chart().addAxis(axis_y, Qt::AlignLeft);
+	plot_utils.chart().legend()->hide();
 
-	plot_utils->applyFontSettings();
-	QFont label_font = plot_utils->getLabelFont();
+	plot_utils.applyFontSettings();
+	QFont label_font = plot_utils.getLabelFont();
 
 	// create bars using QAreaSeries
 	for (int i = 0; i < bars_.size(); ++i)
@@ -132,29 +130,29 @@ void BarPlot::store(QString filename)
 		area->setColor(color);
 		area->setBorderColor(color.darker());
 
-		chart->addSeries(area);
+		plot_utils.chart().addSeries(area);
 		area->attachAxis(axis_x);
 		area->attachAxis(axis_y);
 
 		// need to set the chart size to get the real coordinates for labels
-		chart->resize(width, height);
-		chart->layout()->activate();
+		plot_utils.chart().resize(width, height);
+		plot_utils.chart().layout()->activate();
 
 		QPointF valuePoint(i+0.5, 0);
-		QPointF pixelPoint = chart->mapToPosition(valuePoint, area);
+		QPointF pixelPoint = plot_utils.chart().mapToPosition(valuePoint, area);
 
 		QRectF rect = label->boundingRect();
 		// placing a category label below the x axis
-		label->setPos(pixelPoint.x() - (rect.width() / 2), chart->plotArea().bottom()+rect.height()+10);
+		label->setPos(pixelPoint.x() - (rect.width() / 2), plot_utils.chart().plotArea().bottom()+rect.height()+10);
 
 		label->setRotation(-90);
-		label->setParentItem(chart);
+		label->setParentItem(&plot_utils.chart());
 	}
 
 	// grid lines
 	axis_x->setGridLineVisible(false);
 	axis_y->setGridLineVisible(true);
 
-	plot_utils->overpaintAxisX(axis_x, axis_y, bars_.size() - 0.5);
-	plot_utils->saveAsPng(filename, width, height);
+	plot_utils.overpaintAxisX(axis_x, axis_y, bars_.size() - 0.5);
+	plot_utils.saveAsPng(filename, width, height);
 }

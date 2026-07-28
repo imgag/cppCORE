@@ -4,7 +4,6 @@
 #include <limits>
 #include <algorithm>
 #include <QStringList>
-#include <QChartView>
 #include <QBarCategoryAxis>
 #include <QValueAxis>
 #include <QLogValueAxis>
@@ -171,9 +170,8 @@ void Histogram::store(QString filename, bool x_log_scale, bool y_log_scale, doub
 		return;
 	}
 
-	PlotUtils* plot_utils = new PlotUtils();
-	QChart* chart = plot_utils->getChart();
-	chart->legend()->hide(); // hide legend, since we are using one color
+	PlotUtils plot_utils = PlotUtils();
+	plot_utils.chart().legend()->hide(); // hide legend, since we are using one color
 
 	// Fixing zero values for logarithmic scaling (for X and Y separately)
 	for(int i = 0; i < x.size(); ++i)
@@ -211,7 +209,7 @@ void Histogram::store(QString filename, bool x_log_scale, bool y_log_scale, doub
 		axis_x = value_axis;
 	}
 	if (!xlabel_.isEmpty()) axis_x->setTitleText(xlabel_);
-	chart->addAxis(axis_x, Qt::AlignBottom);
+	plot_utils.chart().addAxis(axis_x, Qt::AlignBottom);
 
 	// Y axis
 	QAbstractAxis *axis_y;
@@ -232,7 +230,7 @@ void Histogram::store(QString filename, bool x_log_scale, bool y_log_scale, doub
 		axis_y = value_axis;
 	}
 	if (!ylabel_.isEmpty()) axis_y->setTitleText(ylabel_);
-	chart->addAxis(axis_y, Qt::AlignLeft);
+	plot_utils.chart().addAxis(axis_y, Qt::AlignLeft);
 
 	// Render the bars
 	QLineSeries *upper = new QLineSeries();
@@ -257,7 +255,7 @@ void Histogram::store(QString filename, bool x_log_scale, bool y_log_scale, doub
 	bar_color.setAlphaF(0.8);
 	area->setColor(bar_color);
 	area->setBorderColor(bar_color.darker());
-	chart->addSeries(area);
+	plot_utils.chart().addSeries(area);
 	area->attachAxis(axis_x);
 	area->attachAxis(axis_y);
 
@@ -278,12 +276,12 @@ void Histogram::store(QString filename, bool x_log_scale, bool y_log_scale, doub
 	QColor x_color(axis_x->gridLineColor());
 	area_x->setColor(x_color);
 	area_x->setBorderColor(x_color);
-	chart->addSeries(area_x);
+	plot_utils.chart().addSeries(area_x);
 	area_x->attachAxis(axis_x);
 	area_x->attachAxis(axis_y);
 
-	plot_utils->applyFontSettings();
-	plot_utils->saveAsPng(filename, 1000, 400);
+	plot_utils.applyFontSettings();
+	plot_utils.saveAsPng(filename, 1000, 400);
 }
 
 void Histogram::storeCombinedHistogram(QString filename, QList<Histogram> histograms, QString xlabel, QString ylabel)
@@ -306,10 +304,9 @@ void Histogram::storeCombinedHistogram(QString filename, QList<Histogram> histog
 		if(max_value < h.maxValue()) max_value = h.maxValue();
 	}
 
-	PlotUtils* plot_utils = new PlotUtils();
-	QChart* chart = plot_utils->getChart();
-	chart->legend()->setVisible(true);
-	chart->legend()->setAlignment(Qt::AlignTop);
+	PlotUtils plot_utils = PlotUtils();
+	plot_utils.chart().legend()->setVisible(true);
+	plot_utils.chart().legend()->setAlignment(Qt::AlignTop);
 
 	int n = histograms.size();
 	for (int i = 0; i < n; ++i)
@@ -335,8 +332,8 @@ void Histogram::storeCombinedHistogram(QString filename, QList<Histogram> histog
 
 	if (!ylabel.isEmpty()) axis_y->setTitleText(ylabel);
 
-	chart->addAxis(axis_x, Qt::AlignBottom);
-	chart->addAxis(axis_y, Qt::AlignLeft);
+	plot_utils.chart().addAxis(axis_x, Qt::AlignBottom);
+	plot_utils.chart().addAxis(axis_y, Qt::AlignLeft);
 
 	foreach (Histogram h, histograms)
 	{
@@ -364,12 +361,12 @@ void Histogram::storeCombinedHistogram(QString filename, QList<Histogram> histog
 		area->setColor(bar_color);
 		area->setBorderColor(bar_color.darker());
 
-		chart->addSeries(area);
+		plot_utils.chart().addSeries(area);
 		area->attachAxis(axis_x);
 		area->attachAxis(axis_y);
 	}
 
-	plot_utils->applyFontSettings();
-	plot_utils->overpaintAxisX(axis_x, axis_y, max);
-	plot_utils->saveAsPng(filename, 1000, 400);
+	plot_utils.applyFontSettings();
+	plot_utils.overpaintAxisX(axis_x, axis_y, max);
+	plot_utils.saveAsPng(filename, 1000, 400);
 }

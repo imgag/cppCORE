@@ -1,7 +1,6 @@
 #include "LinePlot.h"
 
 #include <limits>
-#include <QChartView>
 #include <QLineSeries>
 #include <QValueAxis>
 #include <QLegend>
@@ -65,8 +64,8 @@ void LinePlot::store(QString filename)
 		}
 	}
 
-	PlotUtils* plot_utils = new PlotUtils(); //TODO Alexandr: check for memory leaks everywhere in your code
-	QChart* chart = plot_utils->getChart();
+	PlotUtils plot_utils = PlotUtils();
+	// QChart chart = plot_utils.chart();
 
 	// create axes
 	QValueAxis* axis_x = new QValueAxis();
@@ -87,7 +86,7 @@ void LinePlot::store(QString filename)
 
 	axis_x->setRange(xmin, xmax);
 	axis_x->applyNiceNumbers();
-	chart->addAxis(axis_x, Qt::AlignBottom);
+	plot_utils.chart().addAxis(axis_x, Qt::AlignBottom);
 
 	QValueAxis* axis_y = new QValueAxis();
 	if (!ylabel_.isEmpty()) axis_y->setTitleText(ylabel_);
@@ -96,7 +95,7 @@ void LinePlot::store(QString filename)
 		axis_y->setRange(ymin_, ymax_);
 	}
 	axis_y->applyNiceNumbers();
-	chart->addAxis(axis_y, Qt::AlignLeft);
+	plot_utils.chart().addAxis(axis_y, Qt::AlignLeft);
 
 	// series of data points
 	for (const PlotLine& line : std::as_const(lines_))
@@ -111,7 +110,7 @@ void LinePlot::store(QString filename)
 			series->append(x, line.values[i]);
 		}
 
-		chart->addSeries(series);
+		plot_utils.chart().addSeries(series);
 		series->attachAxis(axis_x);
 		series->attachAxis(axis_y);
 
@@ -128,22 +127,22 @@ void LinePlot::store(QString filename)
 	{
 		if (!lines_[0].label.isEmpty())
 		{
-			chart->setTitle(lines_[0].label);
+			plot_utils.chart().setTitle(lines_[0].label);
 		}
-		chart->legend()->setVisible(false);
+		plot_utils.chart().legend()->setVisible(false);
 	}
 	else
 	{
-		chart->legend()->setVisible(true);
-		chart->legend()->setAlignment(Qt::AlignBottom);
+		plot_utils.chart().legend()->setVisible(true);
+		plot_utils.chart().legend()->setAlignment(Qt::AlignBottom);
 
-		QFont legendFont = chart->legend()->font();
+		QFont legendFont = plot_utils.chart().legend()->font();
 		legendFont.setPointSize(8);
-		chart->legend()->setFont(legendFont);
+		plot_utils.chart().legend()->setFont(legendFont);
 	}
 
-	plot_utils->applyFontSettings();
-	plot_utils->saveAsPng(filename, 600, 400);
+	plot_utils.applyFontSettings();
+	plot_utils.saveAsPng(filename, 600, 400);
 }
 
 

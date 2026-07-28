@@ -5,11 +5,10 @@
 #include <QLineSeries>
 #include <QAreaSeries>
 #include <QLegendMarker>
-#include <QChartView>
 #include <QLegend>
 
 PlotUtils::PlotUtils()
-	: chart_(new QChart())
+	: chart_view_(new QChart())
 {
 	// QChart needs an instance of a GUI app and a screen to be rendered, here we make sure it will work properly on the server in a headless mode.
 	// QT_QPA_PLATFORM=offscreen environment variables has to be set for the headless mode, otherwise an exception will be thrown
@@ -17,9 +16,9 @@ PlotUtils::PlotUtils()
 	if (!qobject_cast<QApplication*>(app)) THROW(ProgrammingException, "The code needs a running GUI application to be able to render plots");
 }
 
-QChart *PlotUtils::getChart()
+QChart& PlotUtils::chart()
 {
-	return chart_;
+	return *chart_view_.chart();
 }
 
 void PlotUtils::applyFontSettings()
@@ -37,13 +36,13 @@ void PlotUtils::applyFontSettings()
 	bold_font.setPixelSize(14);
 	bold_font.setWeight(QFont::Bold);
 
-	chart_->setTitleFont(bold_font);
-	for (auto axis : chart_->axes())
+	chart_view_.chart()->setTitleFont(bold_font);
+	for (auto axis : chart_view_.chart()->axes())
 	{
 		axis->setLabelsFont(regular_font);
 		axis->setTitleFont(bold_font);
 	}
-	chart_->legend()->setFont(regular_font);
+	chart_view_.chart()->legend()->setFont(regular_font);
 }
 
 QFont PlotUtils::getLabelFont()
@@ -73,19 +72,19 @@ void PlotUtils::overpaintAxisX(QValueAxis* axis_x, QValueAxis* axis_y, double ma
 	QColor x_color(axis_x->gridLineColor());
 	area_x->setColor(x_color);
 	area_x->setBorderColor(x_color);
-	chart_->addSeries(area_x);
+	chart_view_.chart()->addSeries(area_x);
 	area_x->attachAxis(axis_x);
 	area_x->attachAxis(axis_y);
 
 
-	for (QAbstractSeries* s : chart_->series())
+	for (QAbstractSeries* s : chart_view_.chart()->series())
 	{
 		QAreaSeries* area = qobject_cast<QAreaSeries*>(s);
 		if (!area) continue;
 
 		if (area->name() == "x_axis")
 		{
-			auto markers = chart_->legend()->markers(area);
+			auto markers = chart_view_.chart()->legend()->markers(area);
 			for (auto m : std::as_const(markers)) m->setVisible(false);
 		}
 	}
@@ -94,24 +93,23 @@ void PlotUtils::overpaintAxisX(QValueAxis* axis_x, QValueAxis* axis_y, double ma
 void PlotUtils::saveAsPng(QString filename, int width, int height)
 {
 	// image rendering
-	QChartView chartView(chart_);
-	chartView.resize(width, height);
-	chartView.setMinimumSize(width, height);
-	chartView.setMaximumSize(width, height);
+	// QChartView chartView(chart_);
+	chart_view_.resize(width, height);
+	chart_view_.setMinimumSize(width, height);
+	chart_view_.setMaximumSize(width, height);
 
 	// antialiasing for smoother lines and text
-	chartView.setRenderHint(QPainter::Antialiasing, true);
-	chartView.setRenderHint(QPainter::TextAntialiasing, true);
-	chartView.setRenderHint(QPainter::SmoothPixmapTransform, true);
+	chart_view_.setRenderHint(QPainter::Antialiasing, true);
+	chart_view_.setRenderHint(QPainter::TextAntialiasing, true);
+	chart_view_.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
 	QApplication::processEvents();
-	QPixmap pixmap = chartView.grab();
+	QPixmap pixmap = chart_view_.grab();
 	pixmap.setDevicePixelRatio(1.0);
 	pixmap = pixmap.scaled(width, height, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 
 	if (!pixmap.save(filename.replace("\\", "/"), "PNG"))
 	{
 		THROW(ProgrammingException, "Could not save bar plot to the file: " + filename);
-	}
-	delete chart_;
+	}	
 }

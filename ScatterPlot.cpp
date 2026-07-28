@@ -6,7 +6,6 @@
 #include <QLineSeries>
 #include <QValueAxis>
 #include <QLogValueAxis>
-#include <QChartView>
 #include <QStringList>
 
 #include "Exceptions.h"
@@ -56,9 +55,8 @@ void ScatterPlot::store(QString filename)
 		}
 	}
 
-	PlotUtils* plot_utils = new PlotUtils();
-	QChart* chart = plot_utils->getChart();
-	chart->legend()->setVisible(color_legend_.count() > 0);
+	PlotUtils plot_utils = PlotUtils();
+	plot_utils.chart().legend()->setVisible(color_legend_.count() > 0);
 
 	// group by color
 	QHash<QString, QList<QPointF>> grouped;
@@ -85,7 +83,7 @@ void ScatterPlot::store(QString filename)
 		}
 
 		s->append(it.value());
-		chart->addSeries(s);
+		plot_utils.chart().addSeries(s);
 	}
 
 	// vertical lines
@@ -100,7 +98,7 @@ void ScatterPlot::store(QString filename)
 		line->setPen(pen);
 		line->setName("");
 
-		chart->addSeries(line);
+		plot_utils.chart().addSeries(line);
 	}
 
 	QAbstractAxis* axis_x = new QValueAxis();
@@ -121,11 +119,11 @@ void ScatterPlot::store(QString filename)
 		axis_y = val_axis;
 	}
 
-	chart->addAxis(axis_x, Qt::AlignBottom);
-	chart->addAxis(axis_y, Qt::AlignLeft);
+	plot_utils.chart().addAxis(axis_x, Qt::AlignBottom);
+	plot_utils.chart().addAxis(axis_y, Qt::AlignLeft);
 
 	// attach axes
-	for (auto* s : chart->series())
+	for (auto* s : plot_utils.chart().series())
 	{
 		s->attachAxis(axis_x);
 		s->attachAxis(axis_y);
@@ -148,6 +146,6 @@ void ScatterPlot::store(QString filename)
 		}
 	}
 
-	plot_utils->applyFontSettings();
-	plot_utils->saveAsPng(filename, 600, 400);
+	plot_utils.applyFontSettings();
+	plot_utils.saveAsPng(filename, 600, 400);
 }
