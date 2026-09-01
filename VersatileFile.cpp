@@ -188,10 +188,11 @@ QByteArray VersatileFile::read(qint64 maxlen)
     {
         QByteArray output;
 
-        for (int offset = 0; offset < result.size(); offset += max_compressed_chunk_size_)
+        for (qsizetype offset = 0; offset < result.size(); offset += max_compressed_chunk_size_)
         {
+            const qsizetype compressed_chunk_size = qMin<qsizetype>(max_compressed_chunk_size_, result.size() - offset);
             QByteArray out;
-            if (!decompressor_.feed(result.mid(offset, max_compressed_chunk_size_), out)) THROW(ProgrammingException, "inflate failed for chunked data");
+            if (!decompressor_.feed(result.constData() + offset, compressed_chunk_size, out)) THROW(ProgrammingException, "inflate failed for chunked data");
 
             if (out.size() >= uncompressed_size_limit_)
             {
@@ -252,10 +253,11 @@ QByteArray VersatileFile::readAll()
         remote_gz_finished_ = true;
         QByteArray output;
 
-        for (int offset = 0; offset < data.size(); offset += max_compressed_chunk_size_)
+        for (qsizetype offset = 0; offset < data.size(); offset += max_compressed_chunk_size_)
         {
+            const qsizetype compressed_chunk_size = qMin<qsizetype>(max_compressed_chunk_size_, data.size() - offset);
             QByteArray out;
-            if (!decompressor_.feed(data.mid(offset, max_compressed_chunk_size_), out)) THROW(ProgrammingException, "inflate failed for chunked data");
+            if (!decompressor_.feed(data.constData() + offset, compressed_chunk_size, out)) THROW(ProgrammingException, "inflate failed for chunked data");
 
             if (out.size() >= uncompressed_size_limit_)
             {
@@ -341,10 +343,11 @@ QByteArray VersatileFile::readLine(bool trim_line_endings)
 			}
 
             remote_position_ += compressed_chunk.size();
-            for (int offset = 0; offset < compressed_chunk.size(); offset += max_compressed_chunk_size_)
+            for (qsizetype offset = 0; offset < compressed_chunk.size(); offset += max_compressed_chunk_size_)
             {
+                const qsizetype compressed_chunk_size = qMin<qsizetype>(max_compressed_chunk_size_, compressed_chunk.size() - offset);
                 QByteArray out;
-                if (!decompressor_.feed(compressed_chunk.mid(offset, max_compressed_chunk_size_), out)) THROW(ProgrammingException, "inflate failed for chunked data");
+                if (!decompressor_.feed(compressed_chunk.constData() + offset, compressed_chunk_size, out)) THROW(ProgrammingException, "inflate failed for chunked data");
                 decompressed_buffer_.append(out);
             }
 		}
