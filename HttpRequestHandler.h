@@ -70,7 +70,7 @@ public:
     ServerReply put(QString url, const QByteArray& data, const HttpHeaders& add_headers = HttpHeaders());
 	//Performs POST request
     ServerReply post(QString url, const QByteArray& data, const HttpHeaders& add_headers = HttpHeaders());
-	//Performs POST request for content type multipart
+	//Performs POST request for content type multipart. Takes ownership of parts.
     ServerReply post(QString url, QHttpMultiPart* parts, const HttpHeaders& add_headers = HttpHeaders());
 
 	//returns the proxy host used for the given URL.

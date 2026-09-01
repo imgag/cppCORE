@@ -224,6 +224,7 @@ ServerReply HttpRequestHandler::post(QString url, QHttpMultiPart* parts, const H
 
     //query
 	QScopedPointer<QNetworkReply> reply(nmgr_.post(request, parts));
+	if (parts!=nullptr) parts->setParent(reply.data());
 
     //make the loop process the reply immediately
     QEventLoop loop;
@@ -327,4 +328,3 @@ QString HttpRequestHandler::networkErrorAsString(QNetworkReply::NetworkError err
         default: return "Unknown network error";
     }
 }
-

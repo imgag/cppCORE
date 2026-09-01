@@ -450,7 +450,7 @@ void VersatileFile::close()
 
 		if (gz_buffer_!=nullptr)
 		{
-			delete gz_buffer_;
+			delete[] gz_buffer_;
 			gz_buffer_ = nullptr;
 		}
 	}

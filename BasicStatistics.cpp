@@ -46,7 +46,8 @@ double BasicStatistics::stdev(const QVector<double>& data, double mean, int star
 	double output = 0.0;
 	for (int i=start_index; i<=end_index; ++i)
 	{
-		output += pow(data[i]-mean, 2);
+		double tmp = data[i]-mean;
+		output += tmp*tmp;
 	}
 	return sqrt(output/n);
 }

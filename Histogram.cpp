@@ -249,6 +249,8 @@ void Histogram::store(QString filename, bool x_log_scale, bool y_log_scale, doub
 		lower->append(next_item, baseline);
 	}
 	QAreaSeries *area = new QAreaSeries(upper, lower);
+	upper->setParent(area);
+	lower->setParent(area);
 	area->setName(label_);
 
 	QColor bar_color(Qt::blue); // set the default color
@@ -271,6 +273,8 @@ void Histogram::store(QString filename, bool x_log_scale, bool y_log_scale, doub
 	upper_x->append(max(), y_base);
 
 	QAreaSeries *area_x = new QAreaSeries(upper_x, lower_x);
+	upper_x->setParent(area_x);
+	lower_x->setParent(area_x);
 	area_x->setName("x_axis");
 
 	QColor x_color(axis_x->gridLineColor());
@@ -354,6 +358,8 @@ void Histogram::storeCombinedHistogram(QString filename, QList<Histogram> histog
 			lower->append(next_item, 0);
 		}
 		QAreaSeries *area = new QAreaSeries(upper, lower);
+		upper->setParent(area);
+		lower->setParent(area);
 		area->setName(h.label_);
 
 		QColor bar_color = h.color_;

@@ -67,6 +67,8 @@ void PlotUtils::overpaintAxisX(QValueAxis* axis_x, QValueAxis* axis_y, double ma
 	upper_x->append(max, 0);
 
 	QAreaSeries *area_x = new QAreaSeries(upper_x, lower_x);
+	upper_x->setParent(area_x);
+	lower_x->setParent(area_x);
 	area_x->setName("x_axis");
 
 	QColor x_color(axis_x->gridLineColor());

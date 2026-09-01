@@ -119,6 +119,8 @@ void BarPlot::store(QString filename)
 		lower->append(right, 0);
 
 		QAreaSeries* area = new QAreaSeries(upper, lower);
+		upper->setParent(area);
+		lower->setParent(area);
 
 		// legend label
 		if (labels_.size() == bars_.size()) area->setName(labels_[i]);
