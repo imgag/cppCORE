@@ -7,7 +7,7 @@
 #include <QSharedPointer>
 #include <QByteArray>
 #include <QObject>
-#include <zlib.h> //TODO Marc try libdeflate instead of zlib
+#include <zlib.h> //TODO Marc try libdeflate instead of zlib. Also for BAM/CRAM via htslib?
 #include "GzipStreamDecompressor.h"
 
 //File class that can handle plain text files, gzipped text files and URLs.
