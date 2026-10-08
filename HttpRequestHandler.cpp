@@ -4,13 +4,19 @@
 #include <QEventLoop>
 #include <QNetworkProxy>
 #include <QHttpMultiPart>
+#include "ToolBase.h"
 
 HttpRequestHandler::HttpRequestHandler(QObject* parent)
 	: QObject(parent)
 	, nmgr_()
 	, headers_()
 {
-	headers_.insert("User-Agent", "GSvar");
+	QString client_info = QString("%1/%2 (%3; %4)")
+		.arg("GSvar")
+		.arg(ToolBase::version())
+		.arg(QSysInfo::prettyProductName())
+		.arg(QSysInfo::currentCpuArchitecture());
+	headers_.insert("User-Agent", client_info.toUtf8());
 
 	//basic authentification
 	connect(&nmgr_, &QNetworkAccessManager::authenticationRequired, this, &HttpRequestHandler::authenticationRequired, Qt::DirectConnection);
