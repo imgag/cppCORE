@@ -12,7 +12,7 @@ QByteArray Parameter::toString(ParameterType type)
 	switch (type)
 	{
 		case ParameterType::INT: return "INT";
-		case ParameterType::FLOAT: return "FLOAT";
+		case ParameterType::DOUBLE: return "DOUBLE";
 		case ParameterType::BOOL: return "BOOL";
 		case ParameterType::STRING: return "STRING";
 		case ParameterType::STRINGLIST: return "STRINGLIST";
@@ -39,21 +39,21 @@ Parameter::Parameter(QByteArray name, QString description, ParameterType type, Q
 	, constraints_(constraints)
 {
 	QString parameter_name = QString::fromUtf8(name_);
-	if (type_ == ParameterType::INT || type_ == ParameterType::FLOAT)
+	if (type_ == ParameterType::INT || type_ == ParameterType::DOUBLE)
 	{
 		for(auto it=constraints.cbegin(); it!=constraints.cend(); ++it)
 		{
 			if (it.key()==ConstraintType::MIN)
 			{
 				QString value_as_str = it.value().toString();
-				if (!Helper::isNumeric(value_as_str)) THROW(ArgumentException, "Int/float parameter '"+name_+"' has non-numeric 'MIN' constraint '" + value_as_str + "'!");
+				if (!Helper::isNumeric(value_as_str)) THROW(ArgumentException, "Int/double parameter '"+name_+"' has non-numeric 'MIN' constraint '" + value_as_str + "'!");
 			}
 			else if (it.key()==ConstraintType::MAX)
 			{
 				QString value_as_str = it.value().toString();
-				if (!Helper::isNumeric(value_as_str)) THROW(ArgumentException, "Int/float parameter '"+name_+"' has non-numeric 'MAX' constraint '" + value_as_str + "'!");
+				if (!Helper::isNumeric(value_as_str)) THROW(ArgumentException, "Int/double parameter '"+name_+"' has non-numeric 'MAX' constraint '" + value_as_str + "'!");
 			}
-			else THROW(ArgumentException, "Int/float parameter '"+name_+"' cannot have constraint '" + Parameter::toString(it.key()) + "'!");
+			else THROW(ArgumentException, "Int/double parameter '"+name_+"' cannot have constraint '" + Parameter::toString(it.key()) + "'!");
 
 			bool ok = false;
 			double limit = it.value().toDouble(&ok);
@@ -74,8 +74,10 @@ Parameter::Parameter(QByteArray name, QString description, ParameterType type, Q
 		{
 			if (it.key()==ConstraintType::ALLOWED_VALUES)
 			{
-				QByteArrayList parts = it.value().toByteArray().split('\t');
-				if (parts.count()<2) THROW(ArgumentException, "String/string-list parameter '"+name_+"' has invalid constraint '" + Parameter::toString(it.key()) + "'!");
+				if (it.value().userType() != QMetaType::QString && it.value().userType() != QMetaType::QByteArray)
+				{
+					THROW(ArgumentException, "String/string-list parameter '"+name_+"' has non-string ALLOWED_VALUES constraint!");
+				}
 			}
 			else if (it.key() != ConstraintType::NON_EMPTY) THROW(ArgumentException, "String/string-list parameter '"+name_+"' cannot have constraint '" + Parameter::toString(it.key()) + "'!");
 		}
@@ -135,13 +137,36 @@ int ParameterList::checkedIndex(const QByteArray& name, ParameterType type) cons
 void ParameterList::setValue(const QByteArray& name, ParameterType type, const QVariant& value, bool emit_changed_signal)
 {
 	const int index = checkedIndex(name, type);
-	const auto& constraints = std::as_const(entries_).at(index).constraints();
+	const QVariant normalized_value = validatedValue(std::as_const(entries_).at(index), value);
+	if (entries_.at(index).value() == normalized_value) return;
+	entries_[index].value_ = normalized_value;
+	if (emit_changed_signal) emit parameterChanged();
+}
+
+void ParameterList::overrideConstraint(const QByteArray& name, ConstraintType type, const QVariant& value)
+{
+	const int index = parameterIndex(name);
+	const Parameter& current = std::as_const(entries_).at(index);
+	auto constraints = current.constraints();
+	constraints.insert(type, value);
+	Parameter updated(current.name(), current.description(), current.type(), constraints);
+	updated.value_ = validatedValue(updated, current.value());
+	if (current.constraints() == updated.constraints()) return;
+	entries_[index] = updated;
+	emit constraintsChanged();
+}
+
+QVariant ParameterList::validatedValue(const Parameter& parameter, const QVariant& value) const
+{
+	const QByteArray& name = parameter.name();
+	const ParameterType type = parameter.type();
+	const auto& constraints = parameter.constraints();
 	if (!value.isValid())
 	{
 		THROW(ArgumentException, "Invalid value for parameter '" + name + "' in parameter list '" + name_ + "'.");
 	}
 	QVariant normalized_value;
-	if (type == ParameterType::INT || type == ParameterType::FLOAT)
+	if (type == ParameterType::INT || type == ParameterType::DOUBLE)
 	{
 		bool ok = false;
 		double numeric_value = value.toDouble(&ok);
@@ -232,7 +257,5 @@ void ParameterList::setValue(const QByteArray& name, ParameterType type, const Q
 		THROW(ProgrammingException, "Unhandled parameter type: " + QString::number(static_cast<int>(type)));
 	}
 
-	if (entries_.at(index).value() == normalized_value) return;
-	entries_[index].value_ = normalized_value;
-	if (emit_changed_signal) emit parameterChanged();
+	return normalized_value;
 }

@@ -12,7 +12,7 @@
 enum class ParameterType
 {
 	INT,
-	FLOAT,
+	DOUBLE,
 	BOOL,
 	STRING,
 	STRINGLIST
@@ -21,9 +21,9 @@ enum class ParameterType
 //Constraint types
 enum class ConstraintType
 {
-	MIN, //INT/FLOAT: min value
-	MAX, //INT/FLOAT: max value
-	ALLOWED_VALUES, //STRINGLIST: allowed values
+	MIN, //INT/DOUBLE: min value
+	MAX, //INT/DOUBLE: max value
+	ALLOWED_VALUES, //STRING/STRINGLIST: tab-separated allowed values
 	NON_EMPTY //STRING/STRINGLIST: forbids empty strings
 };
 
@@ -56,7 +56,7 @@ private:
 	QVariant value_;
 };
 
-//TODO Marc: replace FilterParameter and ParameterData with this class
+//TODO Marc: replace ParameterData with this class
 
 //Ordered parameters with indexed lookup by name.
 class CPPCORESHARED_EXPORT ParameterList
@@ -69,11 +69,13 @@ public:
 	const QByteArray& name() const { return name_; }
 	const Parameter& parameter(const QByteArray& name) const { return entries_.at(parameterIndex(name)); }
 	const QList<Parameter>& parameters() const { return entries_; }
+	//Updates a constraint only if both the constraint and the current value remain valid.
+	void overrideConstraint(const QByteArray& name, ConstraintType type, const QVariant& value);
 
 	int getInt(const QByteArray& name) const { return checkedValue(name, ParameterType::INT).toInt(); }
 	void setInt(const QByteArray& name, int value) { setValue(name, ParameterType::INT, value); }
-	double getFloat(const QByteArray& name) const { return checkedValue(name, ParameterType::FLOAT).toDouble(); }
-	void setFloat(const QByteArray& name, double value) { setValue(name, ParameterType::FLOAT, value); }
+	double getDouble(const QByteArray& name) const { return checkedValue(name, ParameterType::DOUBLE).toDouble(); }
+	void setDouble(const QByteArray& name, double value) { setValue(name, ParameterType::DOUBLE, value); }
 	bool getBool(const QByteArray& name) const { return checkedValue(name, ParameterType::BOOL).toBool(); }
 	void setBool(const QByteArray& name, bool value) { setValue(name, ParameterType::BOOL, value); }
 	QByteArray getString(const QByteArray& name) const { return checkedValue(name, ParameterType::STRING).toByteArray(); }
@@ -83,6 +85,7 @@ public:
 
 signals:
 	void parameterChanged();
+	void constraintsChanged();
 
 private:
 	QByteArray name_;
@@ -93,6 +96,7 @@ private:
 	int checkedIndex(const QByteArray& name, ParameterType type) const;
 	const QVariant& checkedValue(const QByteArray& name, ParameterType type) const { return entries_.at(checkedIndex(name, type)).value(); }
 	void setValue(const QByteArray& name, ParameterType type, const QVariant& value, bool emit_changed_signal = true);
+	QVariant validatedValue(const Parameter& parameter, const QVariant& value) const;
 };
 
 
