@@ -7,7 +7,7 @@
 
 
 
-QByteArray ParameterDescription::toString(ParameterType type)
+QByteArray Parameter::toString(ParameterType type)
 {
 	switch (type)
 	{
@@ -20,7 +20,7 @@ QByteArray ParameterDescription::toString(ParameterType type)
 	THROW(ProgrammingException, "Unhandled parameter type: " + QString::number(static_cast<int>(type)));
 }
 
-QByteArray ParameterDescription::toString(ConstraintType type)
+QByteArray Parameter::toString(ConstraintType type)
 {
 	switch (type)
 	{
@@ -32,7 +32,7 @@ QByteArray ParameterDescription::toString(ConstraintType type)
 	THROW(ProgrammingException, "Unhandled constraint type: " + QString::number(static_cast<int>(type)));
 }
 
-ParameterDescription::ParameterDescription(QByteArray name, QString description, ParameterType type, QHash<ConstraintType, QVariant> constraints)
+Parameter::Parameter(QByteArray name, QString description, ParameterType type, QHash<ConstraintType, QVariant> constraints)
 	: name_(name)
 	, description_(description)
 	, type_(type)
@@ -53,13 +53,13 @@ ParameterDescription::ParameterDescription(QByteArray name, QString description,
 				QString value_as_str = it.value().toString();
 				if (!Helper::isNumeric(value_as_str)) THROW(ArgumentException, "Int/float parameter '"+name_+"' has non-numeric 'MAX' constraint '" + value_as_str + "'!");
 			}
-			else THROW(ArgumentException, "Int/float parameter '"+name_+"' cannot have constraint '" + ParameterDescription::toString(it.key()) + "'!");
+			else THROW(ArgumentException, "Int/float parameter '"+name_+"' cannot have constraint '" + Parameter::toString(it.key()) + "'!");
 
 			bool ok = false;
 			double limit = it.value().toDouble(&ok);
 			if (!ok || !std::isfinite(limit))
 			{
-				THROW(ArgumentException, "Constraint '" + ParameterDescription::toString(it.key()) + "' for parameter '" + name_ + "' is not a representable finite number: '" + it.value().toString() + "'.");
+				THROW(ArgumentException, "Constraint '" + Parameter::toString(it.key()) + "' for parameter '" + name_ + "' is not a representable finite number: '" + it.value().toString() + "'.");
 			}
 		}
 		if (constraints_.contains(ConstraintType::MIN) && constraints_.contains(ConstraintType::MAX)
@@ -75,89 +75,70 @@ ParameterDescription::ParameterDescription(QByteArray name, QString description,
 			if (it.key()==ConstraintType::ALLOWED_VALUES)
 			{
 				QByteArrayList parts = it.value().toByteArray().split('\t');
-				if (parts.count()<2) THROW(ArgumentException, "String/string-list parameter '"+name_+"' has invalid constraint '" + ParameterDescription::toString(it.key()) + "'!");
+				if (parts.count()<2) THROW(ArgumentException, "String/string-list parameter '"+name_+"' has invalid constraint '" + Parameter::toString(it.key()) + "'!");
 			}
-			else if (it.key() != ConstraintType::NON_EMPTY) THROW(ArgumentException, "String/string-list parameter '"+name_+"' cannot have constraint '" + ParameterDescription::toString(it.key()) + "'!");
+			else if (it.key() != ConstraintType::NON_EMPTY) THROW(ArgumentException, "String/string-list parameter '"+name_+"' cannot have constraint '" + Parameter::toString(it.key()) + "'!");
 		}
 	}
 	else
 	{
 		for(auto it=constraints.cbegin(); it!=constraints.cend(); ++it)
 		{
-			THROW(ArgumentException, "String parameter '"+name_+"' cannot have constraint '" + ParameterDescription::toString(it.key()) + "'!");
+			THROW(ArgumentException, "String parameter '"+name_+"' cannot have constraint '" + Parameter::toString(it.key()) + "'!");
 		}
 	}
 }
 
-Parameter::Parameter(QByteArray track_name)
-	: track_name_(track_name)
+ParameterList::ParameterList(QByteArray name, const QList<Parameter>& parameters, const QHash<QByteArray, QVariant>& defaults)
+	: name_(name)
+	, entries_(parameters)
 {
-}
-
-void Parameter::clear()
-{
-	entries_.clear();
-}
-
-void Parameter::append(const ParameterDescription& param)
-{
-	for (const ParameterDescription& entry: std::as_const(entries_))
+	indices_.reserve(entries_.size());
+	for (int i = 0; i < entries_.size(); ++i)
 	{
-		if (entry.name() == param.name())
-		{
-			THROW(ArgumentException, "Parameter '" + QString::fromUtf8(param.name()) + "' added twice to Parameter.");
-		}
+		const QByteArray& name = std::as_const(entries_).at(i).name();
+		if (indices_.contains(name)) THROW(ArgumentException, "Parameter '" + name + "' added twice to parameter list '" + name_ + "'.");
+		indices_.insert(name, i);
 	}
-	entries_.append(param);
-}
-
-const ParameterDescription& Parameter::parameter(const QByteArray& name) const
-{
-	for (const ParameterDescription& entry : entries_)
-	{
-		if (entry.name() == name) return entry;
-	}
-	THROW(ArgumentException, "Unknown parameter '" + name + "'.");
-}
-
-ParameterList::ParameterList(const Parameter& config, const QHash<QByteArray, QVariant>& defaults)
-	: config_(config)
-{
 	//Reject undefined parameter names in defaults
 	for (auto it = defaults.cbegin(); it != defaults.cend(); ++it)
 	{
-		config_.parameter(it.key());
+		parameterIndex(it.key());
 	}
 
 	//add default for each parameter
-	for (const ParameterDescription& parameter : config_.parameters())
+	for (int i = 0; i < entries_.size(); ++i)
 	{
+		const Parameter& parameter = std::as_const(entries_).at(i);
 		auto it = defaults.constFind(parameter.name());
-		if (it == defaults.cend()) THROW(ArgumentException, "Missing default for parameter '" + parameter.name() + "' in track '" + config_.trackName() + "'.");
+		if (it == defaults.cend()) THROW(ArgumentException, "Missing default for parameter '" + parameter.name() + "' in parameter list '" + name_ + "'.");
 
 		setValue(parameter.name(), parameter.type(), it.value(), false);
 	}
 }
 
-const ParameterDescription& ParameterList::checkParameter(const QByteArray& name, ParameterType type) const
+int ParameterList::parameterIndex(const QByteArray& name) const
 {
-	const ParameterDescription& parameter = config_.parameter(name);
-	if (parameter.type() != type) THROW(ArgumentException, "Requested type '"+ParameterDescription::toString(type)+"' for parameter '" + name + "' with type '"+ParameterDescription::toString(parameter.type())+"' in track '"+config_.trackName() +"'.");
-	return parameter;
+	auto it = indices_.constFind(name);
+	if (it == indices_.cend()) THROW(ArgumentException, "Unknown parameter '" + name + "' in parameter list '" + name_ + "'.");
+	return it.value();
 }
 
-const QVariant& ParameterList::checkedValue(const QByteArray& name, ParameterType type) const
+int ParameterList::checkedIndex(const QByteArray& name, ParameterType type) const
 {
-	checkParameter(name, type);
-	return values_.constFind(name).value();
+	int index = parameterIndex(name);
+	const Parameter& parameter = entries_.at(index);
+	if (parameter.type() != type) THROW(ArgumentException, "Requested type '"+Parameter::toString(type)+"' for parameter '" + name + "' with type '"+Parameter::toString(parameter.type())+"' in parameter list '"+name_ +"'.");
+	return index;
 }
 
 void ParameterList::setValue(const QByteArray& name, ParameterType type, const QVariant& value, bool emit_changed_signal)
 {
-	const auto& constraints = checkParameter(name, type).constraints();
+	const int index = checkedIndex(name, type);
+	const auto& constraints = std::as_const(entries_).at(index).constraints();
 	if (!value.isValid())
 	{
-		THROW(ArgumentException, "Invalid value for parameter '" + name + "' in track '" + config_.trackName() + "'.");
+		THROW(ArgumentException, "Invalid value for parameter '" + name + "' in parameter list '" + name_ + "'.");
 	}
 	QVariant normalized_value;
 	if (type == ParameterType::INT || type == ParameterType::FLOAT)
@@ -166,17 +147,17 @@ void ParameterList::setValue(const QByteArray& name, ParameterType type, const Q
 		double numeric_value = value.toDouble(&ok);
 		if (!ok || value.isNull())
 		{
-			THROW(ArgumentException, "Non-numeric value for parameter '" + name + "' in track '" + config_.trackName() + "'.");
+			THROW(ArgumentException, "Non-numeric value for parameter '" + name + "' in parameter list '" + name_ + "'.");
 		}
 		if (!std::isfinite(numeric_value))
 		{
-			THROW(ArgumentException, "Non-finite value for parameter '" + name + "' in track '"+config_.trackName()+"'.");
+			THROW(ArgumentException, "Non-finite value for parameter '" + name + "' in parameter list '"+name_+"'.");
 		}
 		if (type == ParameterType::INT)
 		{
 			if (std::floor(numeric_value) != numeric_value || numeric_value < std::numeric_limits<int>::min() || numeric_value > std::numeric_limits<int>::max())
 			{
-				THROW(ArgumentException, "Value is not a representable integer for parameter '" + name + "' in track '" + config_.trackName() + "'.");
+				THROW(ArgumentException, "Value is not a representable integer for parameter '" + name + "' in parameter list '" + name_ + "'.");
 			}
 			normalized_value = static_cast<int>(numeric_value);
 		}
@@ -186,11 +167,11 @@ void ParameterList::setValue(const QByteArray& name, ParameterType type, const Q
 			double limit = it.value().toDouble();
 			if (it.key() == ConstraintType::MIN && numeric_value < limit)
 			{
-				THROW(ArgumentException, "Value '"+value.toString()+"' of parameter '"+name+"' smaller than MIN constraint ("+QString::number(limit)+") for parameter '" + name + "' in track '"+config_.trackName()+"'.");
+				THROW(ArgumentException, "Value '"+value.toString()+"' of parameter '"+name+"' smaller than MIN constraint ("+QString::number(limit)+") for parameter '" + name + "' in parameter list '"+name_+"'.");
 			}
 			if (it.key() == ConstraintType::MAX && numeric_value > limit)
 			{
-				THROW(ArgumentException, "Value '"+value.toString()+"' of parameter '"+name+"' larger than MAX constraint ("+QString::number(limit)+") for parameter '" + name + "' in track '"+config_.trackName()+"'.");
+				THROW(ArgumentException, "Value '"+value.toString()+"' of parameter '"+name+"' larger than MAX constraint ("+QString::number(limit)+") for parameter '" + name + "' in parameter list '"+name_+"'.");
 			}
 		}
 	}
@@ -198,7 +179,7 @@ void ParameterList::setValue(const QByteArray& name, ParameterType type, const Q
 	{
 		if (value.userType() != QMetaType::Bool || value.isNull())
 		{
-			THROW(ArgumentException, "Non-boolean value for parameter '" + name + "' in track '" + config_.trackName() + "'.");
+			THROW(ArgumentException, "Non-boolean value for parameter '" + name + "' in parameter list '" + name_ + "'.");
 		}
 		normalized_value = value.toBool();
 	}
@@ -206,19 +187,19 @@ void ParameterList::setValue(const QByteArray& name, ParameterType type, const Q
 	{
 		if (value.userType() != QMetaType::QString && value.userType() != QMetaType::QByteArray)
 		{
-			THROW(ArgumentException, "Non-string value for parameter '" + name + "' in track '" + config_.trackName() + "'.");
+			THROW(ArgumentException, "Non-string value for parameter '" + name + "' in parameter list '" + name_ + "'.");
 		}
 		normalized_value = value.toByteArray();
 		if (constraints.contains(ConstraintType::NON_EMPTY) && normalized_value.toByteArray().isEmpty())
 		{
-			THROW(ArgumentException, "Empty string is not allowed for parameter '" + name + "' in track '" + config_.trackName() + "'.");
+			THROW(ArgumentException, "Empty string is not allowed for parameter '" + name + "' in parameter list '" + name_ + "'.");
 		}
 		if (constraints.contains(ConstraintType::ALLOWED_VALUES))
 		{
 			QByteArrayList allowed_values = constraints.value(ConstraintType::ALLOWED_VALUES).toByteArray().split('\t');
 			if (!allowed_values.contains(normalized_value.toByteArray()))
 			{
-				THROW(ArgumentException, "Value '"+value.toByteArray()+"' is not allowed for parameter '" + name + "' in track '"+config_.trackName()+"'.");
+				THROW(ArgumentException, "Value '"+value.toByteArray()+"' is not allowed for parameter '" + name + "' in parameter list '"+name_+"'.");
 			}
 		}
 	}
@@ -226,12 +207,12 @@ void ParameterList::setValue(const QByteArray& name, ParameterType type, const Q
 	{
 		if (value.userType() != qMetaTypeId<QByteArrayList>())
 		{
-			THROW(ArgumentException, "Non-string-list value for parameter '" + name + "' in track '" + config_.trackName() + "'.");
+			THROW(ArgumentException, "Non-string-list value for parameter '" + name + "' in parameter list '" + name_ + "'.");
 		}
 		const QByteArrayList entries = value.value<QByteArrayList>();
 		if (constraints.contains(ConstraintType::NON_EMPTY) && entries.contains(QByteArray()))
 		{
-			THROW(ArgumentException, "Empty string is not allowed in parameter '" + name + "' in track '" + config_.trackName() + "'.");
+			THROW(ArgumentException, "Empty string is not allowed in parameter '" + name + "' in parameter list '" + name_ + "'.");
 		}
 		if (constraints.contains(ConstraintType::ALLOWED_VALUES))
 		{
@@ -240,7 +221,7 @@ void ParameterList::setValue(const QByteArray& name, ParameterType type, const Q
 			{
 				if (!allowed_values.contains(entry))
 				{
-					THROW(ArgumentException, "Value '" + entry + "' is not allowed for parameter '" + name + "' in track '" + config_.trackName() + "'.");
+					THROW(ArgumentException, "Value '" + entry + "' is not allowed for parameter '" + name + "' in parameter list '" + name_ + "'.");
 				}
 			}
 		}
@@ -251,10 +232,7 @@ void ParameterList::setValue(const QByteArray& name, ParameterType type, const Q
 		THROW(ProgrammingException, "Unhandled parameter type: " + QString::number(static_cast<int>(type)));
 	}
 
-	if (emit_changed_signal)
-	{
-		if (values_.constFind(name).value() == normalized_value) return;
-	}
-	values_.insert(name, normalized_value);
+	if (entries_.at(index).value() == normalized_value) return;
+	entries_[index].value_ = normalized_value;
 	if (emit_changed_signal) emit parameterChanged();
 }
