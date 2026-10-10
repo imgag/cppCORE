@@ -119,6 +119,15 @@ ParameterList::ParameterList(QByteArray name, const QList<Parameter>& parameters
 	}
 }
 
+void ParameterList::reset(const QList<Parameter>& parameters, const QHash<QByteArray, QVariant>& defaults)
+{
+	ParameterList validated(name_, parameters, defaults);
+	entries_.swap(validated.entries_);
+	indices_.swap(validated.indices_);
+	emit constraintsChanged();
+	emit parameterChanged();
+}
+
 int ParameterList::parameterIndex(const QByteArray& name) const
 {
 	auto it = indices_.constFind(name);

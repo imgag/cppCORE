@@ -56,7 +56,7 @@ private:
 	QVariant value_;
 };
 
-//TODO Marc: replace ParameterData with this class
+//TODO Marc: replace ParameterData with this class (own refactoring)
 
 //Ordered parameters with indexed lookup by name.
 class CPPCORESHARED_EXPORT ParameterList
@@ -66,6 +66,8 @@ class CPPCORESHARED_EXPORT ParameterList
 
 public:
 	ParameterList(QByteArray name, const QList<Parameter>& parameters, const QHash<QByteArray, QVariant>& defaults);
+	//Replaces parameters and defaults atomically after validating them.
+	void reset(const QList<Parameter>& parameters, const QHash<QByteArray, QVariant>& defaults);
 	const QByteArray& name() const { return name_; }
 	const Parameter& parameter(const QByteArray& name) const { return entries_.at(parameterIndex(name)); }
 	const QList<Parameter>& parameters() const { return entries_; }
