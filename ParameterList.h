@@ -24,7 +24,8 @@ enum class ConstraintType
 	MIN, //INT/DOUBLE: min value
 	MAX, //INT/DOUBLE: max value
 	ALLOWED_VALUES, //STRING/STRINGLIST: tab-separated allowed values
-	NON_EMPTY //STRING/STRINGLIST: forbids empty strings
+	NON_EMPTY, //STRING/STRINGLIST: forbids empty strings
+	DISPLAY_DIGITS //DOUBLE: decimal places in the UI (0..17); does not round stored values
 };
 
 //Metadata and value of one parameter. Values are initialized and updated by ParameterList.

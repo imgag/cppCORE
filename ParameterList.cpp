@@ -28,6 +28,7 @@ QByteArray Parameter::toString(ConstraintType type)
 		case ConstraintType::MAX: return "MAX";
 		case ConstraintType::ALLOWED_VALUES: return "ALLOWED_VALUES";
 		case ConstraintType::NON_EMPTY: return "NON_EMPTY";
+		case ConstraintType::DISPLAY_DIGITS: return "DISPLAY_DIGITS";
 	}
 	THROW(ProgrammingException, "Unhandled constraint type: " + QString::number(static_cast<int>(type)));
 }
@@ -43,6 +44,17 @@ Parameter::Parameter(QByteArray name, QString description, ParameterType type, Q
 	{
 		for(auto it=constraints.cbegin(); it!=constraints.cend(); ++it)
 		{
+			if (it.key() == ConstraintType::DISPLAY_DIGITS)
+			{
+				bool ok = false;
+				double digits = it.value().toDouble(&ok);
+				if (type_ != ParameterType::DOUBLE || !ok || it.value().isNull() || it.value().userType() == QMetaType::Bool
+					|| !std::isfinite(digits) || std::floor(digits) != digits || digits < 0 || digits > std::numeric_limits<double>::max_digits10)
+				{
+					THROW(ArgumentException, "DISPLAY_DIGITS requires a DOUBLE parameter and an integer between 0 and " + QString::number(std::numeric_limits<double>::max_digits10) + " for parameter '" + name_ + "'.");
+				}
+				continue;
+			}
 			if (it.key()==ConstraintType::MIN)
 			{
 				QString value_as_str = it.value().toString();
