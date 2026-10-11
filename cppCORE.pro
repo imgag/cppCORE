@@ -17,6 +17,7 @@ CRYPT_KEY= \\\"$$cat("CRYPT_KEY.txt", lines)\\\"
 DEFINES += "CRYPT_KEY=$$CRYPT_KEY"
 
 SOURCES += \
+    ParameterList.cpp \
     BarPlot.cpp \
     BasicServer.cpp \
     Exceptions.cpp \
@@ -41,6 +42,7 @@ SOURCES += \
     ProxyCredentialsHandler.cpp
 
 HEADERS += ToolBase.h \
+    ParameterList.h \
     BarPlot.h \
     BasicServer.h \
     Exceptions.h \
