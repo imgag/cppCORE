@@ -28,6 +28,7 @@ SOURCES += \
     PlotUtils.cpp \
     ScatterPlot.cpp \
     Settings.cpp \
+    StringPool.cpp \
     Log.cpp \
     Helper.cpp \
     BasicStatistics.cpp \
@@ -54,6 +55,7 @@ HEADERS += ToolBase.h \
     PlotUtils.h \
     ScatterPlot.h \
     Settings.h \
+    StringPool.h \
     Log.h \
     Helper.h \
     BasicStatistics.h \

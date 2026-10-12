@@ -2,6 +2,7 @@
 #include "Exceptions.h"
 #include "Helper.h"
 #include "VersatileTextStream.h"
+#include "StringPool.h"
 
 TsvFile::TsvFile()
 {
@@ -161,8 +162,7 @@ void TsvFile::load(QString filename, bool use_string_hash)
 			QStringList tmp;
 			foreach(QString entry, line.split('\t'))
 			{
-				if (!hash_.contains(entry)) hash_.insert(entry, entry);
-				tmp.append(hash_[entry]);
+				tmp.append(StringPool::get(entry));
 			}
 			rows_ << tmp;
 		}
@@ -172,7 +172,6 @@ void TsvFile::load(QString filename, bool use_string_hash)
 		}
 	}
 
-	hash_.clear();
     filename_ = filename;
 }
 
