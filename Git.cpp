@@ -161,7 +161,6 @@ QByteArrayList Git::clearLocalBranches(QString dir)
 	process.setWorkingDirectory(dir);
 	process.start(git_exe, {"fetch", "--prune"});
 	if (!process.waitForFinished(-1)) throwException(process);
-	qDebug() << __LINE__ << process.readAll();
 
 	//get local branches with details
 	process.start(git_exe, {"branch", "-vv"});
@@ -172,17 +171,14 @@ QByteArrayList Git::clearLocalBranches(QString dir)
 	QByteArrayList deleted;
 	foreach(QByteArray line, lines)
 	{
-		qDebug() << __LINE__ << line;
 		line = line.trimmed();
 		if (line=="" || line.startsWith('*')) continue;
 
 		if (line.contains(": gone]"))
 		{
 			QByteArray name = line.split(' ').first();
-			qDebug() << __LINE__ << name;
 			process.start(git_exe, {"branch", "-D", name});
 			if (!process.waitForFinished(-1)) throwException(process);
-			qDebug() << process.readAll();
 			deleted << name;
 		}
 	}
