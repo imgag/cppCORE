@@ -42,6 +42,9 @@ public:
     //Perform 'git stash pop'
     static QByteArray stashPop(QString dir);
 
+	//Fetches with pruning and force-deletes local branches whose upstream is gone. Returns the deleted branches.
+	static QByteArrayList clearLocalBranches(QString dir);
+
     //Returns the branch the repository is on (if not master/main)
 	static QByteArray branch(QString dir);
 

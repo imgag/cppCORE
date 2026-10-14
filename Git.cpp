@@ -151,6 +151,44 @@ QByteArray Git::stashPop(QString dir)
     return process.readAll();
 }
 
+QByteArrayList Git::clearLocalBranches(QString dir)
+{
+	const QString git_exe = gitExe();
+
+	//fetch remote branches
+    QProcess process;
+    process.setProcessChannelMode(QProcess::MergedChannels);
+	process.setWorkingDirectory(dir);
+	process.start(git_exe, {"fetch", "--prune"});
+	if (!process.waitForFinished(-1)) throwException(process);
+	qDebug() << __LINE__ << process.readAll();
+
+	//get local branches with details
+	process.start(git_exe, {"branch", "-vv"});
+	if (!process.waitForFinished(-1)) throwException(process);
+	QByteArrayList lines = process.readAll().split('\n');
+
+	//delete branches
+	QByteArrayList deleted;
+	foreach(QByteArray line, lines)
+	{
+		qDebug() << __LINE__ << line;
+		line = line.trimmed();
+		if (line=="" || line.startsWith('*')) continue;
+
+		if (line.contains(": gone]"))
+		{
+			QByteArray name = line.split(' ').first();
+			qDebug() << __LINE__ << name;
+			process.start(git_exe, {"branch", "-D", name});
+			if (!process.waitForFinished(-1)) throwException(process);
+			qDebug() << process.readAll();
+			deleted << name;
+		}
+	}
+	return deleted;
+}
+
 QByteArray Git::branch(QString dir)
 {
 	QString git_exe = gitExe();
