@@ -6,6 +6,8 @@
 #include <QVariant>
 #include <QByteArrayList>
 #include <QObject>
+#include <QPointer>
+#include <QMetaProperty>
 #include <QString>
 
 //Parameter type
@@ -69,6 +71,12 @@ public:
 	ParameterList(QByteArray name, const QList<Parameter>& parameters, const QHash<QByteArray, QVariant>& defaults);
 	//Replaces parameters and defaults atomically after validating them.
 	void reset(const QList<Parameter>& parameters, const QHash<QByteArray, QVariant>& defaults);
+	//One-way synchronization to Q_PROPERTY members (lower-case; spaces/hyphens -> underscores).
+	//The fast_access_struct may expose a subset of parameters.
+	//Every custom property must match a parameter and have its exact type.
+	//Never change values through fast_access_struct!
+	//Replaces the previous link; nullptr unlinks. Does not take ownership.
+	void link(QObject* fast_access_struct);
 	const QByteArray& name() const { return name_; }
 	const Parameter& parameter(const QByteArray& name) const { return entries_.at(parameterIndex(name)); }
 	const QList<Parameter>& parameters() const { return entries_; }
@@ -94,7 +102,12 @@ private:
 	QByteArray name_;
 	QList<Parameter> entries_;
 	QHash<QByteArray, int> indices_;
+	QPointer<QObject> linked_object_;
+	QList<QMetaProperty> linked_properties_;
 
+	QList<QMetaProperty> linkProperties(QObject* target) const;
+	void checkLinkThread(QObject* target) const;
+	void syncLinkedValues();
 	int parameterIndex(const QByteArray& name) const;
 	int checkedIndex(const QByteArray& name, ParameterType type) const;
 	const QVariant& checkedValue(const QByteArray& name, ParameterType type) const { return entries_.at(checkedIndex(name, type)).value(); }

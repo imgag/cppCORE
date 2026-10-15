@@ -1,6 +1,7 @@
 #include "ParameterList.h"
 #include "Exceptions.h"
 #include "Helper.h"
+#include <QThread>
 #include <cmath>
 #include <limits>
 #include <utility>
@@ -134,10 +135,87 @@ ParameterList::ParameterList(QByteArray name, const QList<Parameter>& parameters
 void ParameterList::reset(const QList<Parameter>& parameters, const QHash<QByteArray, QVariant>& defaults)
 {
 	ParameterList validated(name_, parameters, defaults);
+	QList<QMetaProperty> properties;
+	if (linked_object_) properties = validated.linkProperties(linked_object_);
 	entries_.swap(validated.entries_);
 	indices_.swap(validated.indices_);
+	linked_properties_.swap(properties);
+	syncLinkedValues();
 	emit constraintsChanged();
 	emit parameterChanged();
+}
+
+void ParameterList::checkLinkThread(QObject* target) const
+{
+	if (QThread::currentThread() != thread() || target->thread() != thread())
+	{
+		THROW(ArgumentException, "Parameter list '" + name_ + "' and its linked object must belong to the current thread.");
+	}
+}
+
+QList<QMetaProperty> ParameterList::linkProperties(QObject* target) const
+{
+	checkLinkThread(target);
+	QList<QMetaProperty> properties;
+	QHash<QByteArray, int> names;
+	const QMetaObject* meta = target->metaObject();
+	for (const Parameter& parameter : entries_)
+	{
+		const QByteArray property_name = parameter.name().toLower().replace(' ', '_').replace('-', '_');
+		const int property_index = meta->indexOfProperty(property_name.constData());
+		QMetaProperty property;
+		if (property_index >= QObject::staticMetaObject.propertyCount())
+		{
+			if (names.contains(property_name))
+			{
+				THROW(ArgumentException, "Multiple parameters map to linked property '" + property_name + "' in parameter list '" + name_ + "'.");
+			}
+			property = meta->property(property_index);
+			if (!property.isWritable() || property.userType() != parameter.value().userType())
+			{
+				THROW(ArgumentException, "Linked property '" + property_name + "' must be writable and have the exact type of parameter '" + parameter.name() + "'.");
+			}
+			names.insert(property_name, property_index);
+		}
+		properties.append(property);
+	}
+	//Catch misspelled fields and schema changes that would otherwise leave stale values.
+	for (int i = QObject::staticMetaObject.propertyCount(); i < meta->propertyCount(); ++i)
+	{
+		const QByteArray property_name = meta->property(i).name();
+		if (!names.contains(property_name))
+		{
+			THROW(ArgumentException, "Linked property '" + property_name + "' has no matching parameter in list '" + name_ + "'.");
+		}
+	}
+	if (names.isEmpty() && !entries_.isEmpty())
+	{
+		THROW(ArgumentException, "Linked object has no parameter properties for list '" + name_ + "'.");
+	}
+	return properties;
+}
+
+void ParameterList::link(QObject* fast_access_struct)
+{
+	QList<QMetaProperty> properties;
+	if (fast_access_struct) properties = linkProperties(fast_access_struct);
+	linked_object_ = fast_access_struct;
+	linked_properties_.swap(properties);
+	syncLinkedValues();
+}
+
+void ParameterList::syncLinkedValues()
+{
+	if (!linked_object_) return;
+	checkLinkThread(linked_object_);
+	for (int i = 0; i < entries_.size(); ++i)
+	{
+		const QMetaProperty& property = linked_properties_.at(i);
+		if (property.isValid() && !property.write(linked_object_, entries_.at(i).value()))
+		{
+			THROW(ProgrammingException, "Could not write linked property '" + QByteArray(property.name()) + "' for parameter list '" + name_ + "'.");
+		}
+	}
 }
 
 int ParameterList::parameterIndex(const QByteArray& name) const
@@ -160,7 +238,16 @@ void ParameterList::setValue(const QByteArray& name, ParameterType type, const Q
 	const int index = checkedIndex(name, type);
 	const QVariant normalized_value = validatedValue(std::as_const(entries_).at(index), value);
 	if (entries_.at(index).value() == normalized_value) return;
+	if (linked_object_) checkLinkThread(linked_object_);
 	entries_[index].value_ = normalized_value;
+	if (linked_object_)
+	{
+		const QMetaProperty& property = linked_properties_.at(index);
+		if (property.isValid() && !property.write(linked_object_, normalized_value))
+		{
+			THROW(ProgrammingException, "Could not write linked property '" + QByteArray(property.name()) + "' for parameter list '" + name_ + "'.");
+		}
+	}
 	if (emit_changed_signal) emit parameterChanged();
 }
 
