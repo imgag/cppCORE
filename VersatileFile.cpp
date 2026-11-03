@@ -26,6 +26,20 @@ VersatileFile::VersatileFile(QString file_name, bool stdin_if_empty)
 	//determine mode
 	if (is_url)
 	{
+		//remote file > check if it exists and determine size,
+		//we check it before detecting GZ headers to avoid reading a non-existing file in the next step
+		QNetworkRequest request(QUrl{file_name_});
+		request.setDecompressedSafetyCheckThreshold(-1);
+		request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+
+		QScopedPointer<QNetworkReply> reply(net_mgr_.head(request));
+		QEventLoop loop;
+		QObject::connect(reply.data(), &QNetworkReply::finished, &loop, &QEventLoop::quit);
+		loop.exec();
+
+		file_exists_ = (reply->error() == QNetworkReply::NoError);
+		if (file_exists_ && file_size_ == -1) file_size_ = reply->header(QNetworkRequest::ContentLengthHeader).toLongLong();
+
 		mode_ = isGzipped() ? URL_GZ : URL;
 	}
 	else
@@ -45,23 +59,6 @@ VersatileFile::VersatileFile(QString file_name, bool stdin_if_empty)
 	else if (mode_==LOCAL_GZ)
 	{
         //nothing to do here - see open method
-	}
-	else //remove file > check if it exists and determine size
-	{
-		QNetworkRequest request(QUrl{file_name_});
-		request.setDecompressedSafetyCheckThreshold(-1);
-		request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-
-		QScopedPointer<QNetworkReply> reply(net_mgr_.head(request));
-		QEventLoop loop;
-		QObject::connect(reply.data(), &QNetworkReply::finished, &loop, &QEventLoop::quit);
-		loop.exec();
-
-		file_exists_ = (reply->error() == QNetworkReply::NoError);
-		if (file_exists_ && file_size_ == -1)
-		{
-			file_size_ = reply->header(QNetworkRequest::ContentLengthHeader).toLongLong();
-		}
 	}
 }
 
@@ -565,6 +562,7 @@ bool VersatileFile::isGzipped()
 	QByteArray first_two_bytes;
 	if (Helper::isHttpUrl(file_name_))
 	{
+		if (!file_exists_) return false;
 		first_two_bytes = httpRangeRequest(0, 1);
 	}
 	else
