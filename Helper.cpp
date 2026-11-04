@@ -407,6 +407,16 @@ bool Helper::isHttpUrl(QString filename)
 	return filename.startsWith("http:") || filename.startsWith("https:");
 }
 
+QString Helper::removeUrlArguments(QString url)
+{
+	if (isHttpUrl(url))
+	{
+		return url.split('?')[0];
+	}
+
+	return url;
+}
+
 QString Helper::formatLargeNumber(long long input_number, const QString& format_type)
 {
 	if (format_type == "raw_counts")

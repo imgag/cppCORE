@@ -163,6 +163,8 @@ public:
 
 	//Returns if the given filename is a HTTP/HTTPS URL.
 	static bool isHttpUrl(QString filename);
+	//Removes arguments starting with '?' from URL, if it is a URL.
+	static QString removeUrlArguments(QString url);
 
 	//Returns a reference to an empty QByteArray
 	static const QByteArray& empty()
