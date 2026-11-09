@@ -410,7 +410,11 @@ bool VersatileFile::atEnd() const
 	}
 	else if (mode_==LOCAL_GZ)
 	{
-		return gzeof(gz_stream_);
+		if (gz_stream_==nullptr) return true;
+		int c = gzgetc(gz_stream_);
+		if (c==-1) return true;
+		gzungetc(c, gz_stream_);
+		return false;
 	}
 	else if (mode_==URL_GZ)
 	{        
