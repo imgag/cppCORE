@@ -86,53 +86,59 @@ ServerReply HttpRequestHandler::head(QString url, const HttpHeaders& add_headers
 
 ServerReply HttpRequestHandler::get(QString url, const HttpHeaders& add_headers)
 {
-    //request
+	//request
 	QNetworkRequest request;
 	request.setDecompressedSafetyCheckThreshold(-1);
-    request.setUrl(url);
-    for(auto it=headers_.begin(); it!=headers_.end(); ++it)
-    {
-        request.setRawHeader(it.key(), it.value());
-    }
-    for(auto it=add_headers.begin(); it!=add_headers.end(); ++it)
-    {
-        request.setRawHeader(it.key(), it.value());
-    }
+	request.setUrl(url);
+	for(auto it=headers_.begin(); it!=headers_.end(); ++it)
+	{
+		request.setRawHeader(it.key(), it.value());
+	}
+	for(auto it=add_headers.begin(); it!=add_headers.end(); ++it)
+	{
+		request.setRawHeader(it.key(), it.value());
+	}
 	request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
 
-    ServerReply output;
+	ServerReply output;
 	const int max_retry_attempts = 5;
 	for (int i=1; i<=max_retry_attempts; ++i)
-    {
-        //query
+	{
+		//query
 		QScopedPointer<QNetworkReply> reply(nmgr_.get(request));
 		reply->setReadBufferSize(0);
 
-        //make the loop process the reply immediately
-        QEventLoop loop;
+		//make the loop process the reply immediately
+		QEventLoop loop;
 		connect(reply.data(), SIGNAL(finished()), &loop, SLOT(quit()));
-        loop.exec();
+		loop.exec();
 
 		//output
 		output.clear();
 		for (const QByteArray& line: reply->rawHeaderList())
-        {
+		{
 			output.headers.insert(line, reply->rawHeader(line));
-        }
-        output.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        output.body = reply->readAll();
-		if (reply->error()!=QNetworkReply::NoError && reply->error()!=QNetworkReply::RemoteHostClosedError)
-        {
-			if (i == max_retry_attempts)
-            {
+		}
+		output.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+		output.body = reply->readAll();
+		if (reply->error()!=QNetworkReply::NoError)
+		{
+			if (i < max_retry_attempts) continue;
+
+			if (!transport_errors_.contains(reply->error()))
+			{
 				THROW_HTTP(HttpException, "HTTP Error: " + networkErrorAsString(reply->error()) + "\nDevice Error: " + reply->errorString()+ "\nReply: " + output.body, output.status_code, output.headers, output.body);
 			}
-			else continue;
-        }
+			else
+			{
+				THROW(TransportException, "Network Error " + networkErrorAsString(reply->error()) + " while accessing '" + url + "'");
+			}
+
+		}
 
 		break;
-    }
-    return output;
+	}
+	return output;
 }
 
 ServerReply HttpRequestHandler::put(QString url, const QByteArray& data, const HttpHeaders& add_headers)

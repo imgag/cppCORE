@@ -88,6 +88,21 @@ private:
 	HttpHeaders headers_;
 	QString user_;
 	QString password_;
+	QList<QNetworkReply::NetworkError> transport_errors_ =
+	{
+		QNetworkReply::TemporaryNetworkFailureError, // link dropped / roaming
+		QNetworkReply::NetworkSessionFailedError,    // no network session
+		QNetworkReply::TimeoutError,                 // socket timeout
+		QNetworkReply::RemoteHostClosedError,        // server closed connection early
+		QNetworkReply::ConnectionRefusedError,       // server down / restarting
+		QNetworkReply::HostNotFoundError,            // DNS failure (often transient)
+		QNetworkReply::ProxyConnectionRefusedError,
+		QNetworkReply::ProxyConnectionClosedError,
+		QNetworkReply::ProxyTimeoutError,
+		QNetworkReply::ProxyNotFoundError,
+		QNetworkReply::UnknownNetworkError,
+		QNetworkReply::UnknownProxyError
+	};
 };
 
 #endif // HTTPREQUESTHANDLER_H

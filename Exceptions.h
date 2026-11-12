@@ -170,6 +170,15 @@ public:
     NetworkException(QString message, QString file, int line, ExceptionType type);
 };
 
+/// Exception for transport level errors (subset of the network exceptions), it is more specific and excludes HTTP
+/// errors. Transport exceptions are needed to handle connectivity issues (e.g. network is unavailable)
+class CPPCORESHARED_EXPORT TransportException
+	: public Exception
+{
+public:
+	TransportException(QString message, QString file, int line, ExceptionType type);
+};
+
 
 #define THROW(name, message) \
 throw name(message, __FILE__, __LINE__, ExceptionType::CRITIAL);
@@ -180,7 +189,7 @@ throw name(message, __FILE__, __LINE__, ExceptionType::WARNING);
 #define INFO(name, message) \
 throw name(message, __FILE__, __LINE__, ExceptionType::INFO);
 
-
+///HTTP-level exception
 #define THROW_HTTP(name, message, status_code, headers, body) \
 throw name(message, __FILE__, __LINE__, ExceptionType::CRITIAL, status_code, headers, body);
 
