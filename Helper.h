@@ -7,6 +7,7 @@
 #include <QFile>
 #include <QStringList>
 #include <QSharedPointer>
+#include <QNetworkReply>
 
 ///Auxilary helper functions class.
 class CPPCORESHARED_EXPORT Helper
@@ -248,6 +249,25 @@ public:
 		output << QByteArrayView(data + start, line.size() - start);
 
 		return output;
+	}
+
+	static bool isTransportError(QNetworkReply::NetworkError error)
+	{
+		return QList<QNetworkReply::NetworkError>
+		{
+			QNetworkReply::TemporaryNetworkFailureError, // link dropped / roaming
+			QNetworkReply::NetworkSessionFailedError,    // no network session
+			QNetworkReply::TimeoutError,                 // socket timeout
+			QNetworkReply::RemoteHostClosedError,        // server closed connection early
+			QNetworkReply::ConnectionRefusedError,       // server down / restarting
+			QNetworkReply::HostNotFoundError,            // DNS failure (often transient)
+			QNetworkReply::ProxyConnectionRefusedError,
+			QNetworkReply::ProxyConnectionClosedError,
+			QNetworkReply::ProxyTimeoutError,
+			QNetworkReply::ProxyNotFoundError,
+			QNetworkReply::UnknownNetworkError,
+			QNetworkReply::UnknownProxyError
+		}.contains(error);
 	}
 
 protected:

@@ -4,11 +4,15 @@
 #include "cppCORE_global.h"
 #include <QFile>
 #include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QEventLoop>
 #include <QSharedPointer>
 #include <QByteArray>
 #include <QObject>
+#include <QTimer>
 #include <zlib.h> //TODO Marc try libdeflate instead of zlib. Also for BAM/CRAM via htslib?
 #include "GzipStreamDecompressor.h"
+#include "Helper.h"
 
 //File class that can handle plain text files, gzipped text files and URLs.
 //If you need QString output with proper handling of the encoding, use VersatileTextStream.
@@ -106,6 +110,69 @@ private:
 
     //gets a chunk from the remote file
     QByteArray httpRangeRequest(qint64 start, qint64 end);
+
+	//sends a GET or HEAD request and waits until it is finished.
+	//'operation' must be QNetworkAccessManager::GetOperation or QNetworkAccessManager::HeadOperation,
+	//retryable network errors are retried up to 5 times with an increasing delay,
+	//on success, calls 'on_success' with the reply and returns its result.
+	template <typename OnSuccess>
+	auto runRequest(QNetworkAccessManager::Operation operation, const QNetworkRequest& request, const QString& action, OnSuccess&& on_success)
+	{
+		const int max_retry_attempts = 5;
+		const long retry_delay_ms = 1000;
+
+		QString last_error;
+		for (int attempt=1; attempt<=max_retry_attempts; ++attempt)
+		{
+			QScopedPointer<QNetworkReply> reply(operation==QNetworkAccessManager::HeadOperation ? net_mgr_.head(request) : net_mgr_.get(request));
+
+			if (!reply->isFinished())
+			{
+				QEventLoop loop;
+				QObject::connect(reply.data(), &QNetworkReply::finished, &loop, &QEventLoop::quit);
+				loop.exec();
+			}
+
+			last_error = reply->errorString();
+
+			if (reply->error()!=QNetworkReply::NoError)
+			{
+				if (attempt==max_retry_attempts)
+				{
+					if (!Helper::isTransportError(reply->error()))
+					{
+						int status_code = 0;
+						QByteArray body = reply.data()->readAll();
+						QMap<QByteArray, QByteArray> headers;
+						QVariant status_attribute = reply.data()->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+						if (status_attribute.isValid()) status_code = status_attribute.toInt();
+						const auto pairs = reply.data()->rawHeaderPairs();
+						for (const auto &h : pairs)
+						{
+							headers.insert(h.first, h.second);
+						}
+
+						THROW_HTTP(HttpException, "HTTP Error: Could not " + action + " " + file_name_ + ": " + last_error + "\nReply: " + body, status_code, headers, body);
+					}
+					else
+					{
+						THROW(NetworkException, "Network Error: " + last_error);
+					}
+				}
+
+				//wait between attempts
+				QEventLoop wait_loop;
+				QTimer::singleShot(retry_delay_ms * attempt, &wait_loop, &QEventLoop::quit);
+				wait_loop.exec();
+				continue;
+			}
+
+			return on_success(*reply);
+		}
+
+		THROW(FileAccessException, "Could not " + action + " " + file_name_ + ": " + last_error);
+	}
+
 };
 
 

@@ -3,8 +3,6 @@
 #include <QUrl>
 #include <QFileInfo>
 #include <QDir>
-#include <QEventLoop>
-#include <QNetworkReply>
 #include <QNetworkProxyFactory>
 #include "ProxyCredentialsHandler.h"
 
@@ -32,13 +30,18 @@ VersatileFile::VersatileFile(QString file_name, bool stdin_if_empty)
 		request.setDecompressedSafetyCheckThreshold(-1);
 		request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
 
-		QScopedPointer<QNetworkReply> reply(net_mgr_.head(request));
-		QEventLoop loop;
-		QObject::connect(reply.data(), &QNetworkReply::finished, &loop, &QEventLoop::quit);
-		loop.exec();
-
-		file_exists_ = (reply->error() == QNetworkReply::NoError);
-		if (file_exists_ && file_size_ == -1) file_size_ = reply->header(QNetworkRequest::ContentLengthHeader).toLongLong();
+		try
+		{
+			file_size_ = runRequest(QNetworkAccessManager::HeadOperation, request, "get size of", [&](QNetworkReply& reply)
+			{
+				return reply.header(QNetworkRequest::ContentLengthHeader).toLongLong();
+			});
+			file_exists_ = true;
+		}
+		catch (FileAccessException&)
+		{
+			file_exists_ = false;
+		}
 
 		mode_ = isGzipped() ? URL_GZ : URL;
 	}
@@ -227,22 +230,13 @@ QByteArray VersatileFile::readAll()
     QNetworkRequest request((QUrl(file_name_)));
 	request.setDecompressedSafetyCheckThreshold(-1);
 	request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-	QScopedPointer<QNetworkReply> reply(net_mgr_.get(request));
 
-    QEventLoop loop;
-	QObject::connect(reply.data(), &QNetworkReply::finished, &loop, &QEventLoop::quit);
-    loop.exec();
-
-    QByteArray data;
-    if (reply->error() == QNetworkReply::NoError)
-    {
-        data = reply->readAll();
-		cursor_position_ += data.size();
-	}
-	else
+	QByteArray data = runRequest(QNetworkAccessManager::GetOperation, request, "readAll() from", [&](QNetworkReply& reply)
 	{
-		THROW(FileAccessException, "Could not readAll() from " + file_name_ + ": " + reply->errorString());
-	}
+		QByteArray result = reply.readAll();
+		cursor_position_ += result.size();
+		return result;
+	});
 
     // remote file is a compressed file
     if (mode_==URL_GZ)
@@ -535,20 +529,10 @@ QByteArray VersatileFile::httpRangeRequest(qint64 start, qint64 end)
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     request.setRawHeader("Range", "bytes=" + QByteArray::number(start) + "-" + QByteArray::number(end));
 
-	QScopedPointer<QNetworkReply> reply(net_mgr_.get(request));
-    QEventLoop loop;
-	QObject::connect(reply.data(), &QNetworkReply::finished, &loop, &QEventLoop::quit);
-    loop.exec();
-
-    QByteArray data;
-    if (reply->error() == QNetworkReply::NoError)
-    {
-        data = reply->readAll();
-	}
-	else
+	QByteArray data = runRequest(QNetworkAccessManager::GetOperation, request, "read["+QString::number(start)+", "+QString::number(end)+"] from", [&](QNetworkReply& reply)
 	{
-		THROW(FileAccessException, "Could not readAll() from " + file_name_ + ": " + reply->errorString());
-	}
+		return reply.readAll();
+	});
 
     return data;
 }

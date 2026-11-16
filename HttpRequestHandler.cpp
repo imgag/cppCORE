@@ -4,7 +4,9 @@
 #include <QEventLoop>
 #include <QNetworkProxy>
 #include <QHttpMultiPart>
+#include <QTimer>
 #include "ToolBase.h"
+#include "Helper.h"
 
 HttpRequestHandler::HttpRequestHandler(QObject* parent)
 	: QObject(parent)
@@ -48,96 +50,6 @@ void HttpRequestHandler::setCredentials(QString user, QString password)
 
 ServerReply HttpRequestHandler::head(QString url, const HttpHeaders& add_headers)
 {
-    //request
-	QNetworkRequest request;
-	request.setDecompressedSafetyCheckThreshold(-1);
-    request.setUrl(url);
-    for(auto it=headers_.begin(); it!=headers_.end(); ++it)
-    {
-        request.setRawHeader(it.key(), it.value());
-    }
-    for(auto it=add_headers.begin(); it!=add_headers.end(); ++it)
-    {
-        request.setRawHeader(it.key(), it.value());
-    }
-
-    //query
-	QScopedPointer<QNetworkReply> reply(nmgr_.head(request));
-
-    //make the loop process the reply immediately
-    QEventLoop loop;
-	connect(reply.data(), SIGNAL(finished()), &loop, SLOT(quit()));
-    loop.exec();
-
-	ServerReply output;
-	for (const QByteArray& line : reply->rawHeaderList())
-	{
-		output.headers.insert(line, reply->rawHeader(line));
-	}
-    output.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-	output.body = reply->readAll();
-    if (reply->error()!=QNetworkReply::NoError)
-    {
-        THROW_HTTP(HttpException, "HTTP Error: " + networkErrorAsString(reply->error()) + "\nIODevice Error: " + reply->errorString(), output.status_code, output.headers, output.body);
-    }
-
-    return output;
-}
-
-ServerReply HttpRequestHandler::get(QString url, const HttpHeaders& add_headers)
-{
-    //request
-	QNetworkRequest request;
-	request.setDecompressedSafetyCheckThreshold(-1);
-    request.setUrl(url);
-    for(auto it=headers_.begin(); it!=headers_.end(); ++it)
-    {
-        request.setRawHeader(it.key(), it.value());
-    }
-    for(auto it=add_headers.begin(); it!=add_headers.end(); ++it)
-    {
-        request.setRawHeader(it.key(), it.value());
-    }
-	request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-
-    ServerReply output;
-	const int max_retry_attempts = 5;
-	for (int i=1; i<=max_retry_attempts; ++i)
-    {
-        //query
-		QScopedPointer<QNetworkReply> reply(nmgr_.get(request));
-		reply->setReadBufferSize(0);
-
-        //make the loop process the reply immediately
-        QEventLoop loop;
-		connect(reply.data(), SIGNAL(finished()), &loop, SLOT(quit()));
-        loop.exec();
-
-		//output
-		output.clear();
-		for (const QByteArray& line: reply->rawHeaderList())
-        {
-			output.headers.insert(line, reply->rawHeader(line));
-        }
-        output.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        output.body = reply->readAll();
-		if (reply->error()!=QNetworkReply::NoError && reply->error()!=QNetworkReply::RemoteHostClosedError)
-        {
-			if (i == max_retry_attempts)
-            {
-				THROW_HTTP(HttpException, "HTTP Error: " + networkErrorAsString(reply->error()) + "\nDevice Error: " + reply->errorString()+ "\nReply: " + output.body, output.status_code, output.headers, output.body);
-			}
-			else continue;
-        }
-
-		break;
-    }
-    return output;
-}
-
-ServerReply HttpRequestHandler::put(QString url, const QByteArray& data, const HttpHeaders& add_headers)
-{
-	//request
 	QNetworkRequest request;
 	request.setDecompressedSafetyCheckThreshold(-1);
 	request.setUrl(url);
@@ -150,7 +62,106 @@ ServerReply HttpRequestHandler::put(QString url, const QByteArray& data, const H
 		request.setRawHeader(it.key(), it.value());
 	}
 
-	//query
+	QScopedPointer<QNetworkReply> reply(nmgr_.head(request));
+
+	//make the loop process the reply immediately
+	QEventLoop loop;
+	connect(reply.data(), SIGNAL(finished()), &loop, SLOT(quit()));
+	loop.exec();
+
+	ServerReply output;
+	for (const QByteArray& line : reply->rawHeaderList())
+	{
+		output.headers.insert(line, reply->rawHeader(line));
+	}
+	output.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+	output.body = reply->readAll();
+	if (reply->error()!=QNetworkReply::NoError)
+	{
+		THROW_HTTP(HttpException, "HTTP Error: " + networkErrorAsString(reply->error()) + "\nIODevice Error: " + reply->errorString(), output.status_code, output.headers, output.body);
+	}
+
+	return output;
+}
+
+ServerReply HttpRequestHandler::get(QString url, const HttpHeaders& add_headers)
+{
+	QNetworkRequest request;
+	request.setDecompressedSafetyCheckThreshold(-1);
+	request.setUrl(url);
+	for(auto it=headers_.begin(); it!=headers_.end(); ++it)
+	{
+		request.setRawHeader(it.key(), it.value());
+	}
+	for(auto it=add_headers.begin(); it!=add_headers.end(); ++it)
+	{
+		request.setRawHeader(it.key(), it.value());
+	}
+	request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+
+	ServerReply output;
+	const int max_retry_attempts = 5;
+	const long retry_delay_ms = 1000;
+
+	for (int i=1; i<=max_retry_attempts; ++i)
+	{
+		QScopedPointer<QNetworkReply> reply(nmgr_.get(request));
+		reply->setReadBufferSize(0);
+
+		//make the loop process the reply immediately
+		QEventLoop loop;
+		connect(reply.data(), SIGNAL(finished()), &loop, SLOT(quit()));
+		loop.exec();
+
+		//output
+		output.clear();
+		for (const QByteArray& line: reply->rawHeaderList())
+		{
+			output.headers.insert(line, reply->rawHeader(line));
+		}
+		output.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+		output.body = reply->readAll();
+		if (reply->error()!=QNetworkReply::NoError)
+		{
+			if (i==max_retry_attempts)
+			{
+				if (!Helper::isTransportError(reply->error()))
+				{
+					THROW_HTTP(HttpException, "HTTP Error: " + networkErrorAsString(reply->error()) + "\nDevice Error: " + reply->errorString()+ "\nReply: " + output.body, output.status_code, output.headers, output.body);
+				}
+				else
+				{
+					THROW(NetworkException, "Network Error: " + networkErrorAsString(reply->error()));
+				}
+			}
+
+			qDebug() << "Reconnection attempt #" + QString::number(i);
+			QEventLoop wait_loop;
+			QTimer::singleShot(retry_delay_ms * i, &wait_loop, &QEventLoop::quit);
+			wait_loop.exec();
+
+			continue;
+		}
+
+		break;
+	}
+	return output;
+}
+
+ServerReply HttpRequestHandler::put(QString url, const QByteArray& data, const HttpHeaders& add_headers)
+{	
+	QNetworkRequest request;
+	request.setDecompressedSafetyCheckThreshold(-1);
+	request.setUrl(url);
+	for(auto it=headers_.begin(); it!=headers_.end(); ++it)
+	{
+		request.setRawHeader(it.key(), it.value());
+	}
+	for(auto it=add_headers.begin(); it!=add_headers.end(); ++it)
+	{
+		request.setRawHeader(it.key(), it.value());
+	}
+
 	QScopedPointer<QNetworkReply> reply(nmgr_.put(request, data));
 
 	//make the loop process the reply immediately
@@ -158,99 +169,95 @@ ServerReply HttpRequestHandler::put(QString url, const QByteArray& data, const H
 	connect(reply.data(), SIGNAL(finished()), &loop, SLOT(quit()));
 	loop.exec();
 
-    //output
-    ServerReply output;
+	//output
+	ServerReply output;
 	for (const QByteArray& line : reply->rawHeaderList())
 	{
 		output.headers.insert(line, reply->rawHeader(line));
 	}
-    output.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    output.body = reply->readAll();
-    if (reply->error()!=QNetworkReply::NoError)
-    {
-        THROW_HTTP(HttpException, "HTTP Error: " + networkErrorAsString(reply->error()) + "\nIODevice Error: " + reply->errorString(), output.status_code, output.headers, output.body);
+	output.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+	output.body = reply->readAll();
+	if (reply->error()!=QNetworkReply::NoError)
+	{
+		THROW_HTTP(HttpException, "HTTP Error: " + networkErrorAsString(reply->error()) + "\nIODevice Error: " + reply->errorString(), output.status_code, output.headers, output.body);
 	}
 
-    return output;
+	return output;
 }
 
 ServerReply HttpRequestHandler::post(QString url, const QByteArray& data, const HttpHeaders& add_headers)
-{
-    //request
-    QNetworkRequest request;
+{   
+	QNetworkRequest request;
 	request.setDecompressedSafetyCheckThreshold(-1);
 	request.setUrl(url);
-    for(auto it=headers_.begin(); it!=headers_.end(); ++it)
-    {
-        request.setRawHeader(it.key(), it.value());
-    }
-    for(auto it=add_headers.begin(); it!=add_headers.end(); ++it)
-    {
-        request.setRawHeader(it.key(), it.value());
-    }
+	for(auto it=headers_.begin(); it!=headers_.end(); ++it)
+	{
+		request.setRawHeader(it.key(), it.value());
+	}
+	for(auto it=add_headers.begin(); it!=add_headers.end(); ++it)
+	{
+		request.setRawHeader(it.key(), it.value());
+	}
 
-    //query
 	QScopedPointer<QNetworkReply> reply(nmgr_.post(request, data));
 
-    //make the loop process the reply immediately
-    QEventLoop loop;
+	//make the loop process the reply immediately
+	QEventLoop loop;
 	connect(reply.data(), SIGNAL(finished()), &loop, SLOT(quit()));
-    loop.exec();
+	loop.exec();
 
-    //output
-    ServerReply output;
+	//output
+	ServerReply output;
 	for (const QByteArray& line : reply->rawHeaderList())
 	{
 		output.headers.insert(line, reply->rawHeader(line));
 	}
-    output.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+	output.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 	output.body = reply->readAll();
-    if (reply->error()!=QNetworkReply::NoError)
-    {
+	if (reply->error()!=QNetworkReply::NoError)
+	{
 		THROW_HTTP(HttpException, "HTTP Error: " + networkErrorAsString(reply->error()) + "\nDevice error: " + reply->errorString() + "\nReply: " + output.body, output.status_code, output.headers, output.body);
-    }
+	}
 
-    return output;
+	return output;
 }
 
 ServerReply HttpRequestHandler::post(QString url, QHttpMultiPart* parts, const HttpHeaders& add_headers)
-{
-    //request
+{   
 	QNetworkRequest request;
 	request.setDecompressedSafetyCheckThreshold(-1);
-    request.setUrl(url);
-    for(auto it=headers_.begin(); it!=headers_.end(); ++it)
-    {
-        request.setRawHeader(it.key(), it.value());
-    }
-    for(auto it=add_headers.begin(); it!=add_headers.end(); ++it)
-    {
-        request.setRawHeader(it.key(), it.value());
-    }
+	request.setUrl(url);
+	for(auto it=headers_.begin(); it!=headers_.end(); ++it)
+	{
+		request.setRawHeader(it.key(), it.value());
+	}
+	for(auto it=add_headers.begin(); it!=add_headers.end(); ++it)
+	{
+		request.setRawHeader(it.key(), it.value());
+	}
 
-    //query
 	QScopedPointer<QNetworkReply> reply(nmgr_.post(request, parts));
 	if (parts!=nullptr) parts->setParent(reply.data());
 
-    //make the loop process the reply immediately
-    QEventLoop loop;
+	//make the loop process the reply immediately
+	QEventLoop loop;
 	connect(reply.data(), SIGNAL(finished()), &loop, SLOT(quit()));
-    loop.exec();
+	loop.exec();
 
-    //output
-    ServerReply output;
+	//output
+	ServerReply output;
 	for (const QByteArray& line : reply->rawHeaderList())
 	{
 		output.headers.insert(line, reply->rawHeader(line));
 	}
-    output.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    output.body = reply->readAll();
-    if (reply->error()!=QNetworkReply::NoError)
-    {
-        THROW_HTTP(HttpException, "HTTP Error: " + networkErrorAsString(reply->error()) + "\nIODevice Error: " + reply->errorString(), output.status_code, output.headers, output.body);
-    }
+	output.status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+	output.body = reply->readAll();
+	if (reply->error()!=QNetworkReply::NoError)
+	{
+		THROW_HTTP(HttpException, "HTTP Error: " + networkErrorAsString(reply->error()) + "\nIODevice Error: " + reply->errorString(), output.status_code, output.headers, output.body);
+	}
 
-    return output;
+	return output;
 }
 
 QString HttpRequestHandler::proxyForUrl(QString url)
@@ -269,8 +276,8 @@ void HttpRequestHandler::handleSslErrors(QNetworkReply* reply, const QList<QSslE
 	foreach(const QSslError& error, errors)
 	{
 		qDebug() << "ignore error" << error.errorString();
-    }
-    reply->ignoreSslErrors(errors);
+	}
+	reply->ignoreSslErrors(errors);
 }
 
 void HttpRequestHandler::authenticationRequired(QNetworkReply* reply, QAuthenticator* authenticator)
@@ -284,53 +291,53 @@ void HttpRequestHandler::authenticationRequired(QNetworkReply* reply, QAuthentic
 QString HttpRequestHandler::networkErrorAsString(QNetworkReply::NetworkError error)
 {
 
-    switch(error)
-    {
-        case QNetworkReply::NetworkError::NoError: return "";
+	switch(error)
+	{
+		case QNetworkReply::NetworkError::NoError: return "";
 
-        // network layer errors [relating to the destination server] (1-99):
-        case QNetworkReply::NetworkError::ConnectionRefusedError: return "Connection refused";
-        case QNetworkReply::NetworkError::RemoteHostClosedError: return "Remote host closed the connection";
-        case QNetworkReply::NetworkError::HostNotFoundError: return "Host not found";
-        case QNetworkReply::NetworkError::TimeoutError: return "Connection timeout has been reached";
-        case QNetworkReply::NetworkError::OperationCanceledError: return "Operation has been canceled";
-        case QNetworkReply::NetworkError::SslHandshakeFailedError: return "SSL handshake failed";
-        case QNetworkReply::NetworkError::TemporaryNetworkFailureError: return "Temporary network failure";
-        case QNetworkReply::NetworkError::NetworkSessionFailedError: return "Network session failed";
-        case QNetworkReply::NetworkError::BackgroundRequestNotAllowedError: return "Background request not allowed";
-        case QNetworkReply::NetworkError::TooManyRedirectsError: return "Too many redirects";
-        case QNetworkReply::NetworkError::InsecureRedirectError: return "Insecure redirect";
-        case QNetworkReply::NetworkError::UnknownNetworkError: return "Unknown network error";
+		// network layer errors [relating to the destination server] (1-99):
+		case QNetworkReply::NetworkError::ConnectionRefusedError: return "Connection refused";
+		case QNetworkReply::NetworkError::RemoteHostClosedError: return "Remote host closed the connection";
+		case QNetworkReply::NetworkError::HostNotFoundError: return "Host not found";
+		case QNetworkReply::NetworkError::TimeoutError: return "Connection timeout has been reached";
+		case QNetworkReply::NetworkError::OperationCanceledError: return "Operation has been canceled";
+		case QNetworkReply::NetworkError::SslHandshakeFailedError: return "SSL handshake failed";
+		case QNetworkReply::NetworkError::TemporaryNetworkFailureError: return "Temporary network failure";
+		case QNetworkReply::NetworkError::NetworkSessionFailedError: return "Network session failed";
+		case QNetworkReply::NetworkError::BackgroundRequestNotAllowedError: return "Background request not allowed";
+		case QNetworkReply::NetworkError::TooManyRedirectsError: return "Too many redirects";
+		case QNetworkReply::NetworkError::InsecureRedirectError: return "Insecure redirect";
+		case QNetworkReply::NetworkError::UnknownNetworkError: return "Unknown network error";
 
-        // proxy errors (101-199):
-        case QNetworkReply::NetworkError::ProxyConnectionRefusedError: return "Proxy connection has been refused";
-        case QNetworkReply::NetworkError::ProxyConnectionClosedError: return "Proxy connection has been closed";
-        case QNetworkReply::NetworkError::ProxyNotFoundError: return "Proxy not found";
-        case QNetworkReply::NetworkError::ProxyTimeoutError: return "Proxy timeout";
-        case QNetworkReply::NetworkError::ProxyAuthenticationRequiredError: return "Proxy authentication required";
-        case QNetworkReply::NetworkError::UnknownProxyError: return "Unknown proxy error";
+		// proxy errors (101-199):
+		case QNetworkReply::NetworkError::ProxyConnectionRefusedError: return "Proxy connection has been refused";
+		case QNetworkReply::NetworkError::ProxyConnectionClosedError: return "Proxy connection has been closed";
+		case QNetworkReply::NetworkError::ProxyNotFoundError: return "Proxy not found";
+		case QNetworkReply::NetworkError::ProxyTimeoutError: return "Proxy timeout";
+		case QNetworkReply::NetworkError::ProxyAuthenticationRequiredError: return "Proxy authentication required";
+		case QNetworkReply::NetworkError::UnknownProxyError: return "Unknown proxy error";
 
-        // content errors (201-299):
-        case QNetworkReply::NetworkError::ContentAccessDenied: return "Content access denied";
-        case QNetworkReply::NetworkError::ContentOperationNotPermittedError: return "Content operation not permitted";
-        case QNetworkReply::NetworkError::ContentNotFoundError: return "Content not found";
-        case QNetworkReply::NetworkError::AuthenticationRequiredError: return "Authentication required";
-        case QNetworkReply::NetworkError::ContentReSendError: return "Content ReSend";
+		// content errors (201-299):
+		case QNetworkReply::NetworkError::ContentAccessDenied: return "Content access denied";
+		case QNetworkReply::NetworkError::ContentOperationNotPermittedError: return "Content operation not permitted";
+		case QNetworkReply::NetworkError::ContentNotFoundError: return "Content not found";
+		case QNetworkReply::NetworkError::AuthenticationRequiredError: return "Authentication required";
+		case QNetworkReply::NetworkError::ContentReSendError: return "Content ReSend";
 
-        case QNetworkReply::NetworkError::ContentConflictError: return "Content conflict";
-        case QNetworkReply::NetworkError::ContentGoneError: return "Content gone";
-        case QNetworkReply::NetworkError::UnknownContentError: return "Unknown content error";
+		case QNetworkReply::NetworkError::ContentConflictError: return "Content conflict";
+		case QNetworkReply::NetworkError::ContentGoneError: return "Content gone";
+		case QNetworkReply::NetworkError::UnknownContentError: return "Unknown content error";
 
-        // protocol errors
-        case QNetworkReply::NetworkError::ProtocolUnknownError: return "Protocol unknown";
-        case QNetworkReply::NetworkError::ProtocolInvalidOperationError: return "Protocol invalid operation";
-        case QNetworkReply::NetworkError::ProtocolFailure: return "Protocol failure";
+		// protocol errors
+		case QNetworkReply::NetworkError::ProtocolUnknownError: return "Protocol unknown";
+		case QNetworkReply::NetworkError::ProtocolInvalidOperationError: return "Protocol invalid operation";
+		case QNetworkReply::NetworkError::ProtocolFailure: return "Protocol failure";
 
-        // Server side errors (401-499)
-        case QNetworkReply::NetworkError::InternalServerError: return "Internal server error";
-        case QNetworkReply::NetworkError::OperationNotImplementedError: return "Operation not implemented";
-        case QNetworkReply::NetworkError::ServiceUnavailableError: return "Service unavailable";
-        case QNetworkReply::NetworkError::UnknownServerError: return "Unknown server error";
-        default: return "Unknown network error";
-    }
+		// Server side errors (401-499)
+		case QNetworkReply::NetworkError::InternalServerError: return "Internal server error";
+		case QNetworkReply::NetworkError::OperationNotImplementedError: return "Operation not implemented";
+		case QNetworkReply::NetworkError::ServiceUnavailableError: return "Service unavailable";
+		case QNetworkReply::NetworkError::UnknownServerError: return "Unknown server error";
+		default: return "Unknown network error";
+	}
 }
